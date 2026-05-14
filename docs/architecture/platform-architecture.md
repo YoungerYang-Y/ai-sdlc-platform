@@ -295,79 +295,73 @@ flowchart TB
 
 ## 实验与评估扩展
 
+### 实验闭环总览
+
 ```mermaid
 flowchart LR
-    subgraph I["输入"]
+    subgraph S1["1. 任务来源"]
         BENCH["Benchmark Cases"]
-        TASK["Ad-hoc Business Tasks"]
+        TASK["Ad-hoc Tasks"]
     end
 
-    subgraph C["控制面"]
-        DASH["Dashboard"]
-        EXP["Experiment Service<br/>batch / version set / benchmark binding"]
-        O["Orchestrator"]
-        SCH["Scheduler"]
+    subgraph S2["2. 实验编排"]
+        EXP["Experiment Service"]
+        BATCH["Experiment Batch"]
+        VS["Version Set<br/>method + execution"]
     end
 
-    subgraph E["执行内核"]
-        AW["Claude Worker"]
-        CW["Codex Worker"]
-        RW["Review Worker"]
-        RT["Runtime Abstraction"]
-        OH["OpenHands"]
-        SB["Sandbox"]
+    subgraph S3["3. 执行内核"]
+        RUN["Workflow Run"]
+        TASKRUN["Task Run"]
+        ATTEMPT["Worker Attempt"]
+        CORE["Orchestrator / Scheduler / Workers / Runtime"]
     end
 
-    subgraph V["观测与评估"]
-        OBS["Observability Service<br/>attempt trace / context / token / tool trace"]
-        EVAL["Evaluation Service<br/>rule / llm / human score"]
-        FEED["Feedback & Labeling<br/>calibration / issue tags"]
-        INS["Insights Layer<br/>trend / compare / cost-performance"]
+    subgraph S4["4. 观测采集"]
+        OBS["Observability Service"]
+        TRACE["Context / Reasoning / Tool / Token / Artifact Trace"]
     end
 
-    subgraph P["存储"]
-        PG["PostgreSQL"]
-        ART["Artifact Store"]
+    subgraph S5["5. 评估与校准"]
+        EVAL["Evaluation Service"]
+        SCORE["Rule / LLM / Human Scorecard"]
+        FEED["Feedback & Labeling"]
+    end
+
+    subgraph S6["6. 洞察与回灌"]
+        INS["Insights & Compare"]
+        OUT["New Skill / Harness Docs / Worker / Model Version"]
+    end
+
+    subgraph UX["控制入口"]
+        DASH["Dashboard / Experiment Console"]
     end
 
     BENCH --> EXP
     TASK --> DASH
-    DASH --> O
-    EXP -->|创建 experiment batch / 绑定 version_set| O
+    DASH --> EXP
+    EXP --> BATCH
+    BATCH --> VS
+    VS --> RUN
 
-    O --> SCH
-    SCH <--> AW
-    SCH <--> CW
-    SCH <--> RW
+    RUN --> TASKRUN
+    TASKRUN --> ATTEMPT
+    ATTEMPT --> CORE
 
-    AW --> RT
-    CW --> RT
-    RW --> RT
-    RT --> OH
-    OH --> SB
+    ATTEMPT --> TRACE
+    CORE --> OBS
+    TRACE --> OBS
 
-    O -->|run / task events| OBS
-    SCH -->|attempt / lease / retry events| OBS
-    AW -->|context / reasoning / tool / token / result| OBS
-    CW -->|context / reasoning / tool / token / result| OBS
-    RW -->|context / reasoning / tool / token / result| OBS
-
-    AW -->|artifacts| ART
-    CW -->|artifacts| ART
-    RW -->|artifacts| ART
-
-    OBS --> PG
-    ART --> PG
     OBS --> EVAL
-    ART --> EVAL
-    PG --> EVAL
-    EVAL -->|scorecards| PG
-    FEED -->|human labels / calibration| EVAL
-    PG --> INS
-    EVAL --> INS
-    DASH --> FEED
-    DASH --> INS
+    EVAL --> SCORE
+    SCORE --> FEED
+    SCORE --> INS
+    FEED --> INS
+    INS --> OUT
+    OUT --> VS
 ```
+
+这张图强调平台的核心价值不是“多跑一次任务”，而是把同一类需求放进统一实验闭环里，持续比较不同 `skill`、`harness docs`、worker、模型与 runtime 配置的性价比，并把结论回灌到下一轮 `version_set`。
 
 ### 扩展目标
 
@@ -409,6 +403,75 @@ flowchart LR
   - `execution_version`：worker 实现、模型、runtime、toolchain、参数配置。
 - `scorecard`
   - 评分结果对象，分为 `attempt_scorecard`、`task_scorecard` 和 `run_scorecard`。
+
+### 观测与评分流水线
+
+```mermaid
+flowchart LR
+    subgraph C1["采集层"]
+        ATTEMPT["Worker Attempt"]
+        CTX["Context Snapshot"]
+        REASON["Reasoning Capture"]
+        TOOL["Tool Trace"]
+        COST["Token / Cost"]
+        ART["Artifact Trace"]
+    end
+
+    subgraph C2["观测索引层"]
+        OBS["Observability Service"]
+        IDX["Attempt Timeline / Search / Replay Index"]
+        META["PostgreSQL Metadata"]
+        STORE["Artifact Store"]
+    end
+
+    subgraph C3["评分层"]
+        RULE["Rule Evaluator"]
+        LLM["LLM Evaluator"]
+        HUMAN["Human Review Queue"]
+        SCORE["Attempt Scorecard"]
+    end
+
+    subgraph C4["聚合与对比层"]
+        AGG["Task / Run Aggregation"]
+        COMP["Experiment Compare"]
+        LABEL["Feedback & Labels"]
+        INS["Insights"]
+    end
+
+    ATTEMPT --> CTX
+    ATTEMPT --> REASON
+    ATTEMPT --> TOOL
+    ATTEMPT --> COST
+    ATTEMPT --> ART
+
+    CTX --> OBS
+    REASON --> OBS
+    TOOL --> OBS
+    COST --> OBS
+    ART --> OBS
+
+    OBS --> IDX
+    OBS --> META
+    ART --> STORE
+
+    IDX --> RULE
+    META --> RULE
+    IDX --> LLM
+    STORE --> LLM
+    IDX --> HUMAN
+
+    RULE --> SCORE
+    LLM --> SCORE
+    HUMAN --> SCORE
+
+    SCORE --> AGG
+    AGG --> COMP
+    SCORE --> LABEL
+    LABEL --> INS
+    COMP --> INS
+```
+
+这张图把实验平台拆成两段工程流水线：上半段负责把 `worker_attempt` 的上下文、思考、工具轨迹、token 和产物沉淀成可回放证据；下半段负责把这些证据转换为 `scorecard`、聚合结果、对比视图和人工标签。
 
 ### 默认观测范围
 
