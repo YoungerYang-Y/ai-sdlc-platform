@@ -185,6 +185,7 @@ flowchart TB
 | **共享层** |
 | Scheduler | `packages/scheduler` | `task_run` 调度、claim/lease、重试、attempt 生命周期 | worker-sdk |
 | Worker SDK | `packages/worker-sdk` | 统一协议、`task_run / worker_attempt` 类型定义 | - |
+| Workflow | `packages/workflow` | Workflow 定义与模板（步骤、顺序、失败策略） | worker-sdk（仅类型导入） |
 | Artifact | `packages/artifact` | 产物存储、元数据管理 | - |
 | Runtime | `packages/runtime` | 运行时抽象接口 | - |
 | **执行面** |

@@ -107,7 +107,8 @@ artifacts/
 - 被 workers 调用（写入 patch、日志、报告）
 - 被 observability 调用（存储大载荷证据，返回 `payload_ref`）
 - 被 orchestrator 调用（读取审查报告用于决策）
-- 不依赖任何其他 workspace 包
+- 无业务包依赖（不依赖任何其他 workspace 包）
+- 基础设施依赖：pg client（元数据索引）、fs/path（文件存储）
 
 ## Phase 1 范围
 

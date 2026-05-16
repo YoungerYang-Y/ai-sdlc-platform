@@ -206,6 +206,7 @@ function handleTaskFailed(workflowRun, stepDef, event):
 - Orchestrator 维护 `processed_events` 表，记录已处理的 eventId
 - 重复 eventId 直接返回 200，不触发状态变更
 - 事件处理和 processed_events 写入在同一事务中
+- Phase 2 按 TTL 清理过期记录，默认保留 30 天
 
 ## Version Set 全链路绑定
 

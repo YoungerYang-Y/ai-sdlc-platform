@@ -89,6 +89,8 @@ sequenceDiagram
 | 输入上下文 | 需求描述 + 仓库状态 | patch + log + 需求描述 | 需求描述 + 仓库状态 |
 | 特殊逻辑 | verify 时运行验收命令 | 加载前序 patch 和日志 | 与 codex-worker 类似 |
 
+> 注意：review-worker 使用 claude-code CLI 作为执行引擎，但其 *角色身份* 是 `review`，`implementation` 字段标记为 `"claude-code"`。命名以角色而非实现区分。
+
 ### Codex Worker Handler
 
 ```ts
