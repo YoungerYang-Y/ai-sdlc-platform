@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"no tests yet\"",
+    "test": "vitest run",
     "lint": "echo \"no lint yet\"",
     "typecheck": "tsc --noEmit"
   }
