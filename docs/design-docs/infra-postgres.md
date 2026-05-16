@@ -99,7 +99,7 @@ CREATE TABLE task_runs (
   id                      uuid PRIMARY KEY,
   workflow_run_id          uuid NOT NULL REFERENCES workflow_runs(id),
   task_type               varchar(32) NOT NULL,
-  status                  varchar(32) NOT NULL DEFAULT 'pending',
+  status                  varchar(32) NOT NULL DEFAULT 'ready',
   priority                int NOT NULL DEFAULT 0,
   max_attempts            int NOT NULL DEFAULT 3,
   current_attempt_count   int NOT NULL DEFAULT 0,
