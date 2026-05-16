@@ -4,11 +4,9 @@
 
 ## 当前活跃需求
 
-> 暂无活跃需求。使用以下命令创建新需求：
-> 
-> ```bash
-> node "$HARNESS_ENGINEERING_SKILL_DIR/scripts/create-requirement.ts" <slug> <medium|large>
-> ```
+| Slug | 标题 | 状态 | 创建日期 | 负责人 |
+|------|------|------|----------|--------|
+| `phase1-minimal-loop` | Phase 1 最小双轨闭环 | spec: draft, plan: not-started | 2026-05-16 | evan |
 
 ---
 
