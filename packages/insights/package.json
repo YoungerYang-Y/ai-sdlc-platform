@@ -1,0 +1,17 @@
+{
+  "name": "@ai-sdlc/insights",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"no tests yet\"",
+    "lint": "echo \"no lint yet\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdlc/evaluation": "workspace:*",
+    "@ai-sdlc/observability": "workspace:*"
+  }
+}

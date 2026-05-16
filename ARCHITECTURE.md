@@ -44,6 +44,11 @@ flowchart LR
   Runtime --> OpenHands["OpenHands<br/>Agent 运行时"]
 ```
 
+**箭头样式说明**：
+- `-->` 实线箭头：依赖方向（import / 编译时依赖，从底层指向上层）
+- `-.->` 虚线箭头：运行时数据流（HTTP 调用、事件通知、读模型查询）
+- `<-->` 双向箭头：读写双向（如数据库操作）
+
 **智能体必须遵守的规则：**
 - 依赖只能从左到右流动（如 Orchestrator 可以导入 Scheduler，但 Scheduler 不能导入 Orchestrator）
 - Worker 通过 SDK 与 Scheduler 通信，不直接依赖 Orchestrator
@@ -120,11 +125,13 @@ flowchart TB
 
     subgraph Control["控制面 (apps/)"]
         O["Orchestrator<br/>apps/orchestrator"]
+        DASH["Dashboard<br/>apps/dashboard (V2)"]
     end
 
     subgraph Shared["共享层 (packages/)"]
         S["Scheduler<br/>packages/scheduler"]
         SDK["Worker SDK<br/>packages/worker-sdk"]
+        WF["Workflow<br/>packages/workflow"]
         A["Artifact<br/>packages/artifact"]
         R["Runtime<br/>packages/runtime"]
     end
@@ -132,6 +139,7 @@ flowchart TB
     subgraph Workers["执行面 (workers/)"]
         CW["Codex Worker<br/>workers/codex-worker"]
         RW["Review Worker<br/>workers/review-worker"]
+        CLW["Claude Worker<br/>workers/claude-worker"]
     end
 
     subgraph Experiment["实验与评估"]
@@ -152,24 +160,30 @@ flowchart TB
 
     USER --> O
     VS --> O
+    WF --> O
     O --> S
     O <--> DB
+    DASH -.->|"读模型"| DB
     
     S <--> DB
     S --> CW
     S --> RW
+    S --> CLW
     S --> ATT
     
     SDK --> CW
     SDK --> RW
+    SDK --> CLW
     
     CW --> R
     RW --> R
+    CLW --> R
     R --> OH
     OH --> SB
     
     CW --> A
     RW --> A
+    CLW --> A
     ATT --> OBS
     A <--> DB
     A <--> FS
@@ -182,6 +196,7 @@ flowchart TB
 |------|------|------|------|
 | **控制面** |
 | Orchestrator | `apps/orchestrator` | `workflow_run` 编排、状态机、任务生成 | scheduler, artifact |
+| Dashboard | `apps/dashboard` | 监控和控制界面（V2） | - |
 | **共享层** |
 | Scheduler | `packages/scheduler` | `task_run` 调度、claim/lease、重试、attempt 生命周期 | worker-sdk |
 | Worker SDK | `packages/worker-sdk` | 统一协议、`task_run / worker_attempt` 类型定义 | - |
@@ -191,9 +206,10 @@ flowchart TB
 | **执行面** |
 | Codex Worker | `workers/codex-worker` | 代码修改和验证，产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | Review Worker | `workers/review-worker` | 代码审查，产生 `worker_attempt` | worker-sdk, runtime, artifact |
+| Claude Worker | `workers/claude-worker` | 代码修改和验证（Claude Code 引擎），产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | **实验与评估** |
-| Version Set | 平台级对象 | 运行身份快照（method + execution） | - |
-| Worker Attempt | 平台级对象 | 单次执行主体，驱动观测与评分 | scheduler, worker-sdk |
+| Version Set | `packages/worker-sdk`（类型）+ `infra/postgres`（持久化） | 运行身份快照（method + execution） | - |
+| Worker Attempt | `packages/worker-sdk`（类型）+ `packages/scheduler`（生命周期） | 单次执行主体，驱动观测与评分 | scheduler, worker-sdk |
 | Observability | `packages/observability` | 证据索引、时间线、回放、聚合状态机 | artifact, worker-sdk |
 | Evaluation | `packages/evaluation` | 规则分、LLM 分、人工校准、scorecard revision | observability, artifact |
 | Insights | `packages/insights` | 相似组分析、标签传播建议、趋势与性价比洞察 | evaluation, observability |
@@ -278,15 +294,3 @@ sequenceDiagram
 - attempt_scorecard / task_scorecard / run_scorecard → PostgreSQL
 
 ## 模块详细设计
-
-各模块的详细设计文档位于对应的 monorepo 目录：
-
-- `apps/orchestrator/DESIGN.md` - Orchestrator 详细设计
-- `packages/scheduler/DESIGN.md` - Scheduler 详细设计
-- `packages/worker-sdk/DESIGN.md` - Worker SDK 协议设计
-- `packages/artifact/DESIGN.md` - Artifact 存储设计
-- `packages/runtime/DESIGN.md` - Runtime 抽象设计
-- `workers/codex-worker/DESIGN.md` - Codex Worker 设计
-- `workers/review-worker/DESIGN.md` - Review Worker 设计
-- `runtimes/openhands/DESIGN.md` - OpenHands 集成设计
-- `infra/postgres/SCHEMA.md` - 数据库 Schema 设计
