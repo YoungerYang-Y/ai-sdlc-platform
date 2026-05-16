@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdlc/artifact": "workspace:*",
     "@ai-sdlc/worker-sdk": "workspace:*",
-    "@ai-sdlc/artifact": "workspace:*"
+    "@hono/node-server": "^2.0.2",
+    "hono": "^4.12.19",
+    "postgres": "^3.4.9"
   }
 }

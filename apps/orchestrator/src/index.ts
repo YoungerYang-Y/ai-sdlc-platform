@@ -38,7 +38,7 @@ export function createOrchestrator(config: OrchestratorConfig) {
 
     await sql`
       INSERT INTO workflow_runs (id, version_set_id, workflow_definition_id, trigger_type, input, status, completed_steps)
-      VALUES (${id}, ${req.versionSetId}, ${defId}, ${req.triggerType}, ${sql.json(req.input)}, 'created', ${sql.json([])})
+      VALUES (${id}, ${req.versionSetId}, ${defId}, ${req.triggerType}, ${sql.json(req.input as any)}, 'created', ${sql.json([])})
     `;
 
     const run: WorkflowRun = {
