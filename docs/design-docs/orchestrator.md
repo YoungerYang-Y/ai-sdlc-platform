@@ -229,8 +229,8 @@ flowchart LR
 | `port` | number | 8000 | HTTP 服务端口 |
 | `db.connectionString` | string | 必填 | PostgreSQL 连接串 |
 | `db.poolSize` | number | 10 | 连接池大小 |
-| `scheduler.baseUrl` | string | 必填 | Scheduler HTTP 地址 |
-| `callbackUrl` | string | 必填 | 本服务回调地址 |
+| `scheduler` | Scheduler instance | 必填 | Phase 1 进程内 createScheduler() 实例；Phase 2 替换为 HTTP client |
+| `callbackUrl` | string | Phase 2 | 独立部署时的回调地址（Phase 1 不需要，进程内回调） |
 | `workflow.defaultDefinitionId` | string | "default" | 默认 workflow 模板 ID |
 
 ## Phase 1 范围

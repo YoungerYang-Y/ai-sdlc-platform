@@ -38,8 +38,8 @@
 | `workflow` | `getDefaultWorkflow()`, `getWorkflow(id)` | orchestrator |
 | `artifact` | `ArtifactStore` (interface) | workers, observability, orchestrator, evaluation |
 | `runtime` | `Runtime`, `RuntimeSession` (interface) | workers |
-| `scheduler` | HTTP API: `/tasks` (submit/cancel/query) | orchestrator |
-| `scheduler` | HTTP API: `/tasks/claim`, `/attempts/*` | workers (via SDK) |
+| `scheduler` | 进程内 API (Phase 1) / HTTP API (Phase 2): submit/cancel/query | orchestrator |
+| `scheduler` | HTTP API: `/tasks/claim`, `/attempts/*` | workers (via SDK，始终走 HTTP) |
 | `scheduler` | `SchedulerEvent` (callback payload) | orchestrator |
 | `scheduler` | `attempt_finished` 通知 | observability |
 | `orchestrator` | HTTP API: `/workflows` (create/query/cancel) | CLI / 外部调用者 |

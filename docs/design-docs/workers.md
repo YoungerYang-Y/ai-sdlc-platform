@@ -79,7 +79,7 @@ sequenceDiagram
 
 ## Worker 差异化
 
-| 维度 | Codex Worker | Review Worker | Claude Worker |
+| 维度 | Codex Worker | Review Worker | Claude Worker (Phase 2) |
 |------|-------------|---------------|---------------|
 | 路径 | `workers/codex-worker` | `workers/review-worker` | `workers/claude-worker` |
 | 角色 | code | review | code |

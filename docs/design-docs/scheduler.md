@@ -110,6 +110,7 @@ interface Scheduler {
 interface SubmitTaskInput {
   workflowRunId: string;
   taskType: TaskType;
+  versionSetId: string;
   params?: Record<string, unknown>;
   priority?: number;  // 默认 0（normal），10=high，-10=low。Phase 1 忽略，预留
   maxAttempts?: number;
@@ -203,6 +204,9 @@ async function fail(req: FailRequest): Promise<void> {
     await repo.updateTaskStatus(taskRun.id, "permanently_failed");
     config.onTaskFailed(taskRun);
   }
+
+  // 通知 Observability：attempt_finished 事件
+  await notifyObservability(attempt.id, attempt.status);
 }
 ```
 

@@ -54,6 +54,12 @@ function getDefaultWorkflow(): WorkflowDefinition;
 function getWorkflow(id: string): Promise<WorkflowDefinition>;
 ```
 
+## TaskType 与 Worker Role 的关系
+
+- `code` 和 `verify` TaskType 由 `code` role 的 Worker 执行（codex-worker、claude-worker）
+- `review` TaskType 由 `review` role 的 Worker 执行（review-worker）
+- verify 不是独立 Worker，而是 code role Worker 支持的第二种任务类型
+
 ## Phase 1 固定模板
 
 ```ts

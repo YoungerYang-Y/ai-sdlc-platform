@@ -41,7 +41,7 @@ verified:
 |------|----------|------|
 | `workflow_run` | `id`, `version_set_id`, `status` | 一次完整需求执行 |
 | `task_run` | `id`, `workflow_run_id`, `task_type`, `status` | workflow 中的阶段级任务 |
-| `worker_attempt` | `id`, `task_run_id`, `worker_type`, `status`, `lease_token`, `started_at`, `finished_at`, `was_orphaned` | 单次真实执行主体 |
+| `worker_attempt` | `id`, `task_run_id`, `implementation`, `status`, `lease_token`, `started_at`, `finished_at`, `was_orphaned` | 单次真实执行主体 |
 
 ### 观测对象
 
@@ -276,7 +276,7 @@ stateDiagram-v2
 - `orphaned` 不是终态，后续补齐后自动恢复为 `complete`
 - 恢复后必须保留历史标记，例如 `was_orphaned` 与恢复时间
 - orphan 判定由 `observability` 自己维护，不属于调度状态
-- 超时策略挂在 `worker_type` 上；运行中看最后一条 `heartbeat/evidence`，结束后看 `attempt_finished` 后是否及时收到 summary
+- 超时策略挂在 `implementation` 上；运行中看最后一条 `heartbeat/evidence`，结束后看 `attempt_finished` 后是否及时收到 summary
 
 **Orphan backfill 触发来源**：
 
@@ -379,7 +379,7 @@ Phase 1 的 `rule` source 评分基于确定性公式，不涉及 LLM 判断：
 | 配置项 | 存储位置 | 说明 |
 |--------|----------|------|
 | `global base rubric` | `packages/evaluation/rubrics/base.yaml` | 全局评分规则和维度描述，版本化在仓库中 |
-| `worker type addendum` | `packages/evaluation/rubrics/{worker_type}.yaml` | 每种 Worker 的评分补充条款 |
+| `worker type addendum` | `packages/evaluation/rubrics/{implementation}.yaml` | 每种 Worker implementation 的评分补充条款 |
 | `task type addendum` | `packages/evaluation/rubrics/tasks/{task_type}.yaml` | 每种任务类型的评分补充条款 |
 | `default_weight_template` | `packages/evaluation/weights/default.yaml` | 默认维度权重模板，`version_set` 创建时复制为快照 |
 
@@ -458,7 +458,7 @@ type CalibrationReason = {
 
 - 同一 `benchmark_case`
 - 同一 `task_type`
-- 同一 `worker_type`
+- 同一 `implementation`
 
 增强约束：
 
@@ -472,7 +472,7 @@ type CalibrationReason = {
 - 刷新策略采用“时间 + 数量”双触发
 - 只做增量重算，不做全量扫描
 
-**第一版参考范围**（通过配置管理，可按 `worker_type` 覆盖）：
+**第一版参考范围**（通过配置管理，可按 `implementation` 覆盖）：
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
