@@ -11,8 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdlc/artifact": "workspace:*",
     "@ai-sdlc/scheduler": "workspace:*",
     "@ai-sdlc/workflow": "workspace:*",
-    "@ai-sdlc/artifact": "workspace:*"
+    "@hono/node-server": "^2.0.2",
+    "hono": "^4.12.19"
   }
 }

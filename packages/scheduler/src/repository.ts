@@ -107,7 +107,7 @@ export class SchedulerRepository {
   }): Promise<TaskRun> {
     const [row] = await this.sql`
       INSERT INTO task_runs (id, workflow_run_id, task_type, max_attempts, timeout_ms, params)
-      VALUES (gen_random_uuid(), ${params.workflowRunId}, ${params.taskType}, ${params.maxAttempts}, ${params.timeoutMs}, ${JSON.stringify(params.params ?? null)})
+      VALUES (gen_random_uuid(), ${params.workflowRunId}, ${params.taskType}, ${params.maxAttempts}, ${params.timeoutMs}, ${this.sql.json(params.params ?? null)})
       RETURNING *
     `;
     return this.mapTaskRun(row!);
