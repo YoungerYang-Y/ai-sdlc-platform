@@ -141,7 +141,6 @@ flowchart TB
     subgraph Workers["执行面 (workers/)"]
         CW["Code Worker<br/>workers/code-worker"]
         RW["Review Worker<br/>workers/review-worker"]
-        CLW["Code Worker<br/>workers/code-worker"]
     end
 
     subgraph Experiment["实验与评估"]
@@ -202,9 +201,8 @@ flowchart TB
 | Artifact | `packages/artifact` | 产物存储、元数据管理 | - |
 | Runtime | `packages/runtime` | 运行时抽象接口 | - |
 | **执行面** |
-| Code Worker | `workers/code-worker` | 代码修改和验证，产生 `worker_attempt` | worker-sdk, runtime, artifact |
+| Code Worker | `workers/code-worker` | 代码修改和验证（支持 codex/claude 等多 implementation），产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | Review Worker | `workers/review-worker` | 代码审查，产生 `worker_attempt` | worker-sdk, runtime, artifact |
-| Code Worker | `workers/code-worker` | 代码修改和验证（Claude Code 引擎），产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | **实验与评估** |
 | Version Set | `packages/worker-sdk`（类型）+ `infra/postgres`（持久化） | 运行身份快照（method + execution） | - |
 | Worker Attempt | `packages/worker-sdk`（类型）+ `packages/scheduler`（生命周期） | 单次执行主体，驱动观测与评分 | scheduler, worker-sdk |

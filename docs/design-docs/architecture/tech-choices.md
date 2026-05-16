@@ -26,7 +26,7 @@ verified:
 |------|------|------------------|
 | Workflow 编排 | 自研 Orchestrator | LangGraph |
 | Worker 内部编排 | 不引入 Agent 框架 | LangGraph、Voltagent |
-| 执行隔离 | OpenHands Sandbox (Phase 2) | Docker-in-Docker、Firecracker |
+| 执行隔离 | 宿主机直接执行 (Phase 1) / OpenHands Sandbox (Phase 2) | Docker-in-Docker、Firecracker |
 | 任务队列 | PostgreSQL (DB-as-queue) | Redis、RabbitMQ |
 | 通信模式 | HTTP 轮询 | WebSocket、gRPC |
 | 包管理 | pnpm workspaces | npm workspaces、Turborepo |
