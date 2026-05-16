@@ -38,7 +38,9 @@ flowchart LR
   Contracts --> Artifact["Artifact<br/>产物管理"]
   SDK --> Scheduler["Scheduler<br/>task_run / attempt lifecycle"]
   SDK --> Workers["Workers<br/>执行器"]
+  SDK --> Workflow["Workflow<br/>定义与模板"]
   Scheduler --> Orchestrator["Orchestrator<br/>workflow_run 编排器"]
+  Workflow --> Orchestrator
   Artifact --> Orchestrator
   Workers --> Runtime["Runtime<br/>运行时抽象"]
   Runtime --> OpenHands["OpenHands<br/>Agent 运行时"]
@@ -195,7 +197,7 @@ flowchart TB
 | 模块 | 路径 | 职责 | 依赖 |
 |------|------|------|------|
 | **控制面** |
-| Orchestrator | `apps/orchestrator` | `workflow_run` 编排、状态机、任务生成 | scheduler, artifact |
+| Orchestrator | `apps/orchestrator` | `workflow_run` 编排、状态机、任务生成 | scheduler, workflow, artifact |
 | Dashboard | `apps/dashboard` | 监控和控制界面（V2） | - |
 | **共享层** |
 | Scheduler | `packages/scheduler` | `task_run` 调度、claim/lease、重试、attempt 生命周期 | worker-sdk |
@@ -294,3 +296,5 @@ sequenceDiagram
 - attempt_scorecard / task_scorecard / run_scorecard → PostgreSQL
 
 ## 模块详细设计
+
+各模块的详细设计文档集中管理在 `docs/design-docs/`，索引见 `docs/design-docs/index.md`。
