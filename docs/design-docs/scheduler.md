@@ -110,9 +110,9 @@ interface Scheduler {
 interface SubmitTaskInput {
   workflowRunId: string;
   taskType: TaskType;
-  input: Record<string, unknown>;
-  priority?: "high" | "normal" | "low";  // Phase 1 忽略，预留
-  maxRetries?: number;
+  params?: Record<string, unknown>;
+  priority?: number;  // 默认 0（normal），10=high，-10=low。Phase 1 忽略，预留
+  maxAttempts?: number;
 }
 ```
 
@@ -131,12 +131,12 @@ interface SubmitTaskInput {
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending: submitTask()
-    pending --> claimed: claim（创建 attempt）
-    claimed --> pending: attempt failed + 可重试
+    [*] --> ready: submitTask()
+    ready --> claimed: claim（创建 attempt）
+    claimed --> ready: attempt failed + 可重试
     claimed --> completed: attempt completed
     claimed --> permanently_failed: attempt failed + 不可重试/重试耗尽
-    pending --> cancelled: cancelTask()
+    ready --> cancelled: cancelTask()
     claimed --> cancelled: cancelTask()
 ```
 
@@ -144,12 +144,12 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> created: claim 时创建
-    created --> executing: 首次 heartbeat
-    executing --> completed: complete()
-    executing --> failed: fail()
-    executing --> expired: lease 过期
-    created --> expired: lease 过期（Worker 从未开始）
+    [*] --> claimed: claim 时创建
+    claimed --> running: 首次 heartbeat
+    running --> completed: complete()
+    running --> failed: fail()
+    running --> expired: lease 过期
+    claimed --> expired: lease 过期（Worker 从未开始）
 ```
 
 ### 3. 核心流程
@@ -158,7 +158,7 @@ stateDiagram-v2
 
 ```ts
 async function claim(req: ClaimRequest): Promise<ClaimResponse | null> {
-  const taskRun = await repo.findAndLockPendingTask(req.supportedTaskTypes);
+  const taskRun = await repo.findAndLockReadyTask(req.supportedTaskTypes);
   if (!taskRun) return null;
 
   await repo.updateTaskStatus(taskRun.id, "claimed");
@@ -168,10 +168,13 @@ async function claim(req: ClaimRequest): Promise<ClaimResponse | null> {
     workerId: req.workerId,
     implementation: req.implementation,
     versionSetId: req.versionSetId,
-    status: "created",
+    status: "claimed",
+    attemptNumber: taskRun.currentAttemptCount + 1,
     leaseToken: generateLeaseToken(),
     leaseExpiresAt: now() + config.leaseDefaultMs,
   });
+
+  await repo.incrementAttemptCount(taskRun.id);
 
   return { taskRun, attempt, leaseToken: attempt.leaseToken, leaseDurationMs: config.leaseDefaultMs };
 }
@@ -192,12 +195,10 @@ async function fail(req: FailRequest): Promise<void> {
   const taskRun = await repo.findTaskRun(attempt.taskRunId);
   const shouldRetry = req.failureType !== "business_error"
     && req.failureType !== "cancelled"
-    && taskRun.attemptCount < config.maxRetriesByTaskType[taskRun.taskType];
+    && taskRun.currentAttemptCount < taskRun.maxAttempts;
 
   if (shouldRetry) {
-    await repo.updateTaskStatus(taskRun.id, "pending", {
-      availableAfter: now() + config.retryDelayMs,
-    });
+    await repo.updateTaskStatus(taskRun.id, "ready");
   } else {
     await repo.updateTaskStatus(taskRun.id, "permanently_failed");
     config.onTaskFailed(taskRun);
@@ -220,66 +221,45 @@ async function scanExpiredLeases(): Promise<void> {
 
 ### 4. 数据模型
 
-#### task_runs 表
+数据模型以 `docs/design-docs/infra-postgres.md` 的 DDL 为权威来源。此处列出 Scheduler 关注的核心字段：
 
-```sql
-CREATE TABLE task_runs (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workflow_run_id  UUID NOT NULL,
-  task_type       TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'pending',
-  priority        TEXT NOT NULL DEFAULT 'normal',
-  input           JSONB NOT NULL,
-  attempt_count   INTEGER NOT NULL DEFAULT 0,
-  max_retries     INTEGER NOT NULL DEFAULT 3,
-  available_after TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+#### task_runs 关键字段
 
-CREATE INDEX idx_task_runs_claimable
-  ON task_runs (created_at)
-  WHERE status = 'pending';
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | uuid PK | |
+| `workflow_run_id` | uuid FK | |
+| `task_type` | varchar(32) | code / verify / review |
+| `status` | varchar(32) | ready / claimed / completed / permanently_failed / cancelled |
+| `priority` | int | 默认 0，Phase 1 不使用 |
+| `max_attempts` | int | 最大尝试次数 |
+| `current_attempt_count` | int | 已尝试次数 |
+| `timeout_ms` | int | lease 时长（毫秒） |
+| `params` | jsonb | 任务参数 |
 
-CREATE INDEX idx_task_runs_workflow
-  ON task_runs (workflow_run_id);
-```
+#### worker_attempts 关键字段
 
-#### worker_attempts 表
-
-```sql
-CREATE TABLE worker_attempts (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  task_run_id     UUID NOT NULL REFERENCES task_runs(id),
-  worker_id       TEXT NOT NULL,
-  implementation  TEXT NOT NULL,
-  version_set_id  UUID NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'created',
-  lease_token     TEXT NOT NULL UNIQUE,
-  lease_expires_at TIMESTAMPTZ NOT NULL,
-  failure_type    TEXT,
-  failure_reason  TEXT,
-  started_at      TIMESTAMPTZ,
-  finished_at     TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_attempts_lease_expiry
-  ON worker_attempts (lease_expires_at)
-  WHERE status IN ('created', 'executing');
-
-CREATE INDEX idx_attempts_task_run
-  ON worker_attempts (task_run_id);
-```
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | uuid PK | |
+| `task_run_id` | uuid FK | |
+| `worker_id` | varchar(128) | |
+| `implementation` | varchar(32) | kiro / codex / claude-code / custom |
+| `version_set_id` | uuid FK | |
+| `status` | varchar(32) | claimed / running / completed / failed / expired |
+| `attempt_number` | int | 第几次尝试 |
+| `lease_token` | varchar(128) UNIQUE | |
+| `lease_expires_at` | timestamptz | |
+| `last_heartbeat_at` | timestamptz | |
+| `was_orphaned` | boolean | |
 
 #### Claim SQL
 
 ```sql
 SELECT * FROM task_runs
-WHERE status = 'pending'
+WHERE status = 'ready'
   AND task_type = ANY($1)
-  AND (available_after IS NULL OR available_after <= now())
-ORDER BY created_at ASC
+ORDER BY priority DESC, created_at ASC
 LIMIT 1
 FOR UPDATE SKIP LOCKED;
 ```
@@ -312,8 +292,7 @@ packages/scheduler/
 | `db` | DatabasePool | 必填 | PostgreSQL 连接池 |
 | `leaseDefaultMs` | number | 300_000 (5min) | 默认 lease 时长 |
 | `leaseScanIntervalMs` | number | 30_000 (30s) | 过期扫描间隔 |
-| `retryDelayMs` | number | 30_000 (30s) | 重试等待间隔 |
-| `maxRetriesByTaskType` | Record | `{code:3, verify:2, review:1}` | 最大重试次数 |
+| `defaultMaxAttempts` | number | 3 | 默认最大尝试次数（task 未指定时） |
 | `onTaskCompleted` | callback | 必填 | 完成通知 |
 | `onTaskFailed` | callback | 必填 | 最终失败通知 |
 
@@ -328,6 +307,8 @@ packages/scheduler/
 | 按 failureType 重试决策 | 自定义重试策略插件 |
 | 嵌入 Orchestrator 进程 | 独立服务部署 |
 | 回调通知 Orchestrator | HTTP webhook / 事件总线 |
+
+> Phase 1 约束：Scheduler 嵌入 Orchestrator 进程，通过回调函数通知，无网络地址依赖。Phase 2 拆为独立服务时需引入服务发现或注册制 callback。
 
 ## 反模式
 
