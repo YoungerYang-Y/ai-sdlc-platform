@@ -7,7 +7,7 @@
 > 暂无活跃需求。使用以下命令创建新需求：
 > 
 > ```bash
-> node "C:\Users\YangYang\.kiro\skills\harness-docs/scripts/create-requirement.ts" <slug> <medium|large>
+> node "$HARNESS_ENGINEERING_SKILL_DIR/scripts/create-requirement.ts" <slug> <medium|large>
 > ```
 
 ---
