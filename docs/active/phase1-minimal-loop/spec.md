@@ -1,10 +1,10 @@
 ---
 id: spec-phase1-minimal-loop
-status: draft
+status: shipped
 owner: "evan"
 tags: [phase1, delivery, experiment, core]
 created: 2026-05-16
-updated: 2026-05-16
+updated: 2026-05-17
 ---
 
 # 产品规格：Phase 1 最小双轨闭环

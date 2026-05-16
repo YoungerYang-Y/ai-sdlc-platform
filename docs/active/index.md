@@ -6,7 +6,7 @@
 
 | Slug | 标题 | 状态 | 创建日期 | 负责人 |
 |------|------|------|----------|--------|
-| `phase1-minimal-loop` | Phase 1 最小双轨闭环 | spec: draft, plan: not-started | 2026-05-16 | evan |
+| `phase1-minimal-loop` | Phase 1 最小双轨闭环 | ✅ shipped | 2026-05-16 | evan |
 
 ---
 

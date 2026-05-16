@@ -1,10 +1,10 @@
 ---
 id: plan-phase1-minimal-loop
-status: not-started
+status: completed
 owner: "evan"
 tags: [phase1, delivery, experiment, core]
 created: 2026-05-16
-updated: 2026-05-16
+updated: 2026-05-17
 ---
 
 # 计划：Phase 1 最小双轨闭环实现
@@ -24,7 +24,7 @@ updated: 2026-05-16
 - scope: `infra/postgres/`, `package.json`, `tsconfig.json`
 - verify: `pnpm install && pnpm typecheck`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 可编译的 monorepo + 数据库迁移脚本 + 开发用 docker-compose（PostgreSQL）
 
 工作内容：
@@ -40,7 +40,7 @@ updated: 2026-05-16
 - scope: `packages/worker-sdk/src/`
 - verify: `pnpm --filter @ai-sdlc/worker-sdk test`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 可导入的 Worker SDK 包，含类型定义 + createWorker 框架 + 测试辅助
 
 工作内容：
@@ -58,7 +58,7 @@ updated: 2026-05-16
 - scope: `packages/artifact/src/`
 - verify: `pnpm --filter @ai-sdlc/artifact test`
 - agent: subagent-1
-- status: todo
+- status: done
 - deliverable: ArtifactStore 接口 + 文件系统后端 + 元数据索引
 
 工作内容：
@@ -72,7 +72,7 @@ updated: 2026-05-16
 - scope: `packages/runtime/src/`
 - verify: `pnpm --filter @ai-sdlc/runtime test`
 - agent: subagent-2
-- status: todo
+- status: done
 - deliverable: Runtime 接口 + CliRuntime 适配器
 
 工作内容：
@@ -86,7 +86,7 @@ updated: 2026-05-16
 - scope: `packages/scheduler/src/`
 - verify: `pnpm --filter @ai-sdlc/scheduler test`
 - agent: main
-- status: todo
+- status: done
 - deliverable: Scheduler 库（CommandService + QueryService + LeaseScanner + HTTP Router）
 
 工作内容：
@@ -103,7 +103,7 @@ updated: 2026-05-16
 - scope: `packages/workflow/src/`
 - verify: `pnpm --filter @ai-sdlc/workflow test`
 - agent: subagent-1
-- status: todo
+- status: done
 - deliverable: WorkflowDefinition 类型 + getDefaultWorkflow()
 
 工作内容：
@@ -117,7 +117,7 @@ updated: 2026-05-16
 - scope: `packages/observability/src/`
 - verify: `pnpm --filter @ai-sdlc/observability test`
 - agent: subagent-2
-- status: todo
+- status: done
 - deliverable: Observability 服务（EvidenceIngester + 状态机 + OrphanReaper + EvalTrigger）
 
 工作内容：
@@ -134,7 +134,7 @@ updated: 2026-05-16
 - scope: `apps/orchestrator/src/`
 - verify: `pnpm --filter @ai-sdlc/orchestrator test`
 - agent: main
-- status: todo
+- status: done
 - deliverable: Orchestrator HTTP 服务（WorkflowEngine + StateMachine + CallbackHandler）
 
 工作内容：
@@ -151,7 +151,7 @@ updated: 2026-05-16
 - scope: `workers/code-worker/src/`, `workers/review-worker/src/`
 - verify: `pnpm --filter @ai-sdlc/code-worker test && pnpm --filter @ai-sdlc/review-worker test`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 可运行的 Code Worker + Review Worker 进程
 
 工作内容：
@@ -166,7 +166,7 @@ updated: 2026-05-16
 - scope: 全部
 - verify: `scripts/e2e-test.sh`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 通过的端到端测试 + 基础 rule score 生成
 
 工作内容：
