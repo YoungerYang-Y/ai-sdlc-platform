@@ -76,6 +76,8 @@ verified:
 
 `workflow_run` 和 `worker_attempt` 都必须可回溯到 `version_set`。
 
+**不可变性约束**：`version_set` 一旦创建即不可变（immutable）。任何配置组合的变化必须创建新的 `version_set`，不允许就地修改已有记录。这保证了所有绑定到该 `version_set` 的 `workflow_run` 和 `worker_attempt` 的可追溯性和对比可信度。
+
 ### 3. 第一阶段的最小双轨闭环
 
 第一阶段必须同时具备以下能力：
@@ -111,23 +113,53 @@ verified:
 
 #### Phase 3: Full Evaluation & Optimization Loop
 
-- 完整混合评分：rule + LLM + human
-- calibration queue
-- feedback labeling
-- compare / trend / cost-performance insight
+该阶段结束时能回答：
+
+- **交付侧**：系统能否基于评估结果自动选择更优的 version_set 配置？
+- **实验侧**：操作者能否从一组实验批次中识别出哪个配置在成本和质量之间最优？
+
+闭环能力：
+- 混合评分（rule + LLM + human）对同一 attempt 产出可信最终分
+- calibration queue 将异常样本引导到人工校准，校准结果回馈评分模型
+- feedback labeling 在 attempt 级挂载问题标签，传播建议生成 version_set / benchmark 级洞察
+- compare / trend 视图让操作者可回答"版本 A 在哪些维度优于版本 B"
 
 #### Phase 4: Productionization
 
-- 多租户、权限、审计
-- Redis / 分布式队列
-- 对象存储
-- OTel / 告警 / 高可用 / 配额
+该阶段结束时能回答：
+
+- **交付侧**：系统能否在多团队并发使用下稳定运行，并满足 SLO？
+- **实验侧**：实验批次能否在资源配额限制下自动排队，且不影响交付链路？
+
+闭环能力：
+- 多租户隔离使不同团队的 workflow_run 和 experiment batch 互不干扰
+- Redis / 分布式队列使任务调度水平扩展，单点故障不导致全局停摆
+- OTel + 告警形成"异常 → 告警 → 定位 → 修复"闭环
+- 配额管理使实验批次在资源受限时自动排队而非失败
 
 ### 5. 文档维护规则
 
 - `README.md` 中的多期计划必须反映双轨分期，而不是把实验平台整体后置为单独大阶段。
 - `ARCHITECTURE.md` 中涉及核心对象模型的章节，必须体现 `workflow_run / task_run / worker_attempt / version_set` 的分层关系。
 - 任何把实验能力整体推迟到后期的大改动，都应先更新本 RFC，再修改路线图。
+
+**可自动检测的规则**（纳入 `lint-docs.ts` 或 CI 脚本）：
+
+1. `README.md` 中每个 Phase/阶段描述段落必须同时包含 `delivery`（或"交付"）和 `experiment`（或"实验"）关键词——缺失则报错
+2. `ARCHITECTURE.md` 中 "核心对象模型" 章节必须同时出现 `workflow_run`、`task_run`、`worker_attempt`、`version_set` 四个标识符
+3. Phase 描述中禁止出现纯 bullet 功能清单（无"能回答"或"闭环能力"限定词的 Phase 段落视为违规）
+
+### 6. 降级策略
+
+当某一阶段的实验侧能力无法按期交付时：
+
+| 场景 | 降级行为 | 约束 |
+|------|----------|------|
+| Phase 1 实验侧延期 | 允许 delivery mode 先独立上线，但 `worker_attempt` 和 `version_set` 的 schema 必须已就绪（空实现可接受） | 不允许 schema 也推迟——否则后续补入成本等同返工 |
+| 观测事件上报不稳定 | attempt 标记 `observability_degraded`，不参与评分但保留执行结果 | delivery mode 不受影响 |
+| 评估链路不可用 | scorecard 不生成，已有 attempt 证据正常入库，待恢复后批量补评 | 不阻塞后续任务调度 |
+
+降级不改变架构约束——恢复后必须补齐缺失数据，而非永久跳过。
 
 ## 反模式
 

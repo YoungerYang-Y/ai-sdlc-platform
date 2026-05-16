@@ -5,6 +5,7 @@
 | id | 主题 | status | owner | 适用范围 | 路径 |
 |----|------|--------|-------|----------|------|
 | `arch-dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `docs/design-docs/arch-dual-track-roadmap.md` |
+| `arch-attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `docs/design-docs/arch-attempt-observability-evaluation.md` |
 
 ## status 含义
 

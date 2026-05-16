@@ -73,7 +73,10 @@ flowchart LR
 
 ## 关键架构决策
 
-详见 `docs/design-docs/core-beliefs.md`。与演进路线直接相关的补充约束见 `docs/design-docs/arch-dual-track-roadmap.md`。
+详见 `docs/design-docs/core-beliefs.md`。与演进路线和实验执行链路直接相关的补充约束见：
+
+- `docs/design-docs/arch-dual-track-roadmap.md`
+- `docs/design-docs/arch-attempt-observability-evaluation.md`
 
 ## 核心对象模型
 
@@ -104,6 +107,8 @@ flowchart LR
 - `run_scorecard`
 
 评分对象属于评估域，不参与执行时序决策；执行系统负责“把任务跑完”，评估系统负责“把结果评出来”。
+
+`worker_attempt` 的观测协议、`attempt_finished / attempt_summary_report` 完整性规则、observability 状态机、scorecard revision、human calibration 和标签传播建议，统一受 `docs/design-docs/arch-attempt-observability-evaluation.md` 约束。
 
 ## 总体架构
 
@@ -188,6 +193,9 @@ flowchart TB
 | **实验与评估** |
 | Version Set | 平台级对象 | 运行身份快照（method + execution） | - |
 | Worker Attempt | 平台级对象 | 单次执行主体，驱动观测与评分 | scheduler, worker-sdk |
+| Observability | `packages/observability` | 证据索引、时间线、回放、聚合状态机 | artifact, worker-sdk |
+| Evaluation | `packages/evaluation` | 规则分、LLM 分、人工校准、scorecard revision | observability, artifact |
+| Insights | `packages/insights` | 相似组分析、标签传播建议、趋势与性价比洞察 | evaluation, observability |
 | **运行时** |
 | OpenHands | `runtimes/openhands` | Agent 运行时集成 | - |
 | Sandbox | `runtimes/sandbox` | 隔离执行环境 | - |

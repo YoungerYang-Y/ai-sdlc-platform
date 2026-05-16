@@ -16,7 +16,8 @@ updated: 2026-05-14
 | 运行时抽象 | 屏蔽 OpenHands/Sandbox 实现细节 | `packages/runtime` | Runtime, RuntimeSession |
 | 产物管理 | 存储和管理 patch、日志、报告 | `packages/artifact` | Artifact, ArtifactStore |
 | 实验控制 | 管理 benchmark、experiment batch 和 `version_set` | 平台级对象（V1-V3） | BenchmarkCase, ExperimentBatch, VersionSet |
-| 观测与评估 | 管理 attempt 证据、scorecard、反馈标签和 compare 结果 | 平台级对象（V1-V3） | AttemptScorecard, TaskScorecard, RunScorecard, FeedbackLabel |
+| 观测与评估 | 管理 attempt 证据、scorecard、反馈标签和 compare 结果 | `packages/observability`, `packages/evaluation` | AttemptScorecard, TaskScorecard, RunScorecard, FeedbackLabel |
+| 洞察分析 | 相似组分析、标签传播建议、趋势与性价比洞察 | `packages/insights` | LabelPropagationSuggestion, SimilarityGroup, TrendReport |
 
 ## 领域间关系
 
@@ -31,6 +32,7 @@ flowchart LR
   Workers --> Artifact
   Workers --> Observability
   Observability --> Artifact
+  Insights["洞察分析"] --> Observability
 ```
 
 ## 领域通信规则
@@ -43,3 +45,4 @@ flowchart LR
 - Runtime 抽象层对 Worker 透明，Worker 不感知具体运行时实现
 - `version_set` 属于实验控制域：标识一次运行的 `method_version` 与 `execution_version`
 - 评分与 compare 属于观测与评估域，不参与执行时序决策
+- `insights` 只消费 `evaluation` 和 `observability` 的读模型，不写执行事实或评分；传播建议需人工确认后才生效
