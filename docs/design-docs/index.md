@@ -2,26 +2,26 @@
 
 项目级通用设计决策。每个文档定义一个跨功能的设计主题，智能体在相关领域编码前应先查阅。
 
-## 架构级文档
+## 架构级文档 (`architecture/`)
 
 | id | 主题 | status | owner | 适用范围 | 路径 |
 |----|------|--------|-------|----------|------|
-| `arch-dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `arch-dual-track-roadmap.md` |
-| `arch-attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `arch-attempt-observability-evaluation.md` |
+| `dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `architecture/dual-track-roadmap.md` |
+| `attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `architecture/attempt-observability-evaluation.md` |
 
-## 模块设计文档
+## 模块设计文档 (`modules/`)
 
 | id | 模块 | 深度 | status | 路径 |
 |----|------|------|--------|------|
-| `artifact` | packages/artifact | 轻量 | draft | `artifact.md` |
-| `runtime` | packages/runtime | 轻量 | draft | `runtime.md` |
-| `worker-sdk` | packages/worker-sdk | 深度 | draft | `worker-sdk.md` |
-| `workflow` | packages/workflow | 轻量 | draft | `workflow.md` |
-| `scheduler` | packages/scheduler | 深度 | draft | `scheduler.md` |
-| `orchestrator` | apps/orchestrator | 深度 | draft | `orchestrator.md` |
-| `observability` | packages/observability | 深度 | draft | `observability.md` |
-| `workers` | workers/* | 轻量 | draft | `workers.md` |
-| `infra-postgres` | infra/postgres | 完整 DDL | draft | `infra-postgres.md` |
+| `worker-sdk` | packages/worker-sdk | 深度 | draft | `modules/worker-sdk.md` |
+| `scheduler` | packages/scheduler | 深度 | draft | `modules/scheduler.md` |
+| `orchestrator` | apps/orchestrator | 深度 | draft | `modules/orchestrator.md` |
+| `observability` | packages/observability | 深度 | draft | `modules/observability.md` |
+| `workflow` | packages/workflow | 轻量 | draft | `modules/workflow.md` |
+| `runtime` | packages/runtime | 轻量 | draft | `modules/runtime.md` |
+| `artifact` | packages/artifact | 轻量 | draft | `modules/artifact.md` |
+| `workers` | workers/* | 轻量 | draft | `modules/workers.md` |
+| `infra-postgres` | infra/postgres | 完整 DDL | draft | `modules/infra-postgres.md` |
 
 ## 接口依赖矩阵
 
@@ -38,8 +38,8 @@
 | `workflow` | `getDefaultWorkflow()`, `getWorkflow(id)` | orchestrator |
 | `artifact` | `ArtifactStore` (interface) | workers, observability, orchestrator, evaluation |
 | `runtime` | `Runtime`, `RuntimeSession` (interface) | workers |
-| `scheduler` | 进程内 API (Phase 1) / HTTP API (Phase 2): submit/cancel/query | orchestrator |
-| `scheduler` | HTTP API: `/tasks/claim`, `/attempts/*` | workers (via SDK，始终走 HTTP) |
+| `scheduler` | HTTP API: `/tasks` (submit/cancel/query) | orchestrator |
+| `scheduler` | HTTP API: `/tasks/claim`, `/attempts/*` | workers (via SDK) |
 | `scheduler` | `SchedulerEvent` (callback payload) | orchestrator |
 | `scheduler` | `attempt_finished` 通知 | observability |
 | `orchestrator` | HTTP API: `/workflows` (create/query/cancel) | CLI / 外部调用者 |
@@ -57,15 +57,16 @@
 
 ## 何时创建 design-doc
 
-- 需要修改 `ARCHITECTURE.md` 或 `core-beliefs.md` 中的长期约束时，先创建 `arch-` 前缀的 design-doc 作为架构 RFC
-- 发现跨多个需求的通用设计问题时（如缓存策略、幂等设计、错误码规范）
+- 需要修改 `ARCHITECTURE.md` 或 `core-beliefs.md` 中的长期约束时，先创建架构 RFC 到 `architecture/` 目录
+- 发现跨多个需求的通用设计问题时（如缓存策略、幂等设计、错误码规范），放入 `modules/`
 - 实施过程中需要违反现有依赖方向或架构约束时，暂停实施，先创建架构 RFC
 
 **不要用 design-doc 替代需求目录中的 design.md**——需求级的设计放在 `docs/active/{需求}/design.md`，项目级的通用决策放在这里。
 
 ## 如何添加
 
-1. 复制 `_template.md` 为 `{主题名}.md`（架构 RFC 用 `arch-` 前缀）
-2. 填写 frontmatter 和所有章节
-3. 在上方目录表中添加条目
-4. status 设为 draft；落地验证后更新为 verified
+1. 确定类型：架构 RFC → `architecture/`，模块/通用设计 → `modules/`
+2. 复制 `_template.md` 为目标文件
+3. 填写 frontmatter 和所有章节
+4. 在上方目录表中添加条目
+5. status 设为 draft；落地验证后更新为 verified

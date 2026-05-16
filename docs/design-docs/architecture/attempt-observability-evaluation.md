@@ -1,5 +1,5 @@
 ---
-id: arch-attempt-observability-evaluation
+id: attempt-observability-evaluation
 status: draft
 owner: "evan"
 tags: [architecture, observability, evaluation, worker-attempt, experiment-platform]

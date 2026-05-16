@@ -24,7 +24,7 @@ AI SDLC Platform 是一个 AI 驱动的软件开发生命周期平台，通过�
 ### A. 长期约束（只读，修改需架构 RFC）
 
 - 系统全貌（分层、技术栈、依赖方向）：`ARCHITECTURE.md`
-- 演进路线与双轨分期约束：`docs/design-docs/arch-dual-track-roadmap.md`
+- 演进路线与双轨分期约束：`docs/design-docs/architecture/dual-track-roadmap.md`
 - 业务领域划分（领域边界、职责、实体）：`docs/DOMAINS.md`
 - 核心工程信条（跨所有决策的长期原则）：`docs/design-docs/core-beliefs.md`
 - 可靠性标准（SLO、可观测性）：`docs/RELIABILITY.md`
@@ -54,7 +54,7 @@ AI SDLC Platform 是一个 AI 驱动的软件开发生命周期平台，通过�
 
 ## 标准工作流（单任务）
 
-1. **读上下文**：阅读最近相关的需求文档（`docs/active/{需求}/spec.md`、`design.md`）与长期约束（`ARCHITECTURE.md` / `docs/design-docs/arch-dual-track-roadmap.md` / `docs/DOMAINS.md` / `docs/design-docs/core-beliefs.md` / `docs/SECURITY.md` / `docs/RELIABILITY.md`）。方法论参考 `docs/guides/WORKFLOW.md`。
+1. **读上下文**：阅读最近相关的需求文档（`docs/active/{需求}/spec.md`、`design.md`）与长期约束（`ARCHITECTURE.md` / `docs/design-docs/architecture/dual-track-roadmap.md` / `docs/DOMAINS.md` / `docs/design-docs/core-beliefs.md` / `docs/SECURITY.md` / `docs/RELIABILITY.md`）。方法论参考 `docs/guides/WORKFLOW.md`。
 2. **先出计划**：非平凡任务先在 `docs/active/{需求}/plan.md` 基于 `docs/active/_template/plan.md` 产出一份简短计划——目标、任务清单、影响范围。
 3. **标注假设与风险**：把假设、外部依赖、失败风险写入计划的"决策日志"和"风险与阻塞"表，不要隐藏在脑子里。
 4. **小步分层实施**：每次改动保持范围可控、分层清晰；**不违反依赖方向与架构约束**；如确需违反，暂停任务，升级为独立的架构 RFC。
