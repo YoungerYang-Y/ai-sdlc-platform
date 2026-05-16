@@ -79,19 +79,19 @@ sequenceDiagram
 
 ## Worker 差异化
 
-| 维度 | Codex Worker | Review Worker | Claude Worker (Phase 2) |
+| 维度 | Code Worker | Review Worker | Code Worker (Phase 2) |
 |------|-------------|---------------|---------------|
-| 路径 | `workers/codex-worker` | `workers/review-worker` | `workers/claude-worker` |
+| 路径 | `workers/code-worker` | `workers/review-worker` | `workers/code-worker` |
 | 角色 | code | review | code |
 | 支持的 TaskType | code, verify | review | code, verify |
 | Runtime Type | cli (codex CLI) | cli (claude-code CLI) | cli (claude CLI) |
 | 主要产物 | patch, log | review_report | patch, log |
 | 输入上下文 | 需求描述 + 仓库状态 | patch + log + 需求描述 | 需求描述 + 仓库状态 |
-| 特殊逻辑 | verify 时运行验收命令 | 加载前序 patch 和日志 | 与 codex-worker 类似 |
+| 特殊逻辑 | verify 时运行验收命令 | 加载前序 patch 和日志 | 与 code-worker 类似 |
 
 > 注意：review-worker 使用 claude-code CLI 作为执行引擎，但其 *角色身份* 是 `review`，`implementation` 字段标记为 `"claude-code"`。命名以角色而非实现区分。
 
-### Codex Worker Handler
+### Code Worker Handler
 
 ```ts
 async function codexHandler(ctx: TaskContext): Promise<TaskResult> {
@@ -162,13 +162,13 @@ async function reviewHandler(ctx: TaskContext): Promise<TaskResult> {
 ## Worker 配置
 
 ```ts
-// codex-worker
+// code-worker
 { roles: ["code"], implementation: "codex", supportedTaskTypes: ["code", "verify"] }
 
 // review-worker
 { roles: ["review"], implementation: "claude-code", supportedTaskTypes: ["review"] }
 
-// claude-worker
+// code-worker
 { roles: ["code"], implementation: "claude-code", supportedTaskTypes: ["code", "verify"] }
 ```
 
@@ -176,7 +176,7 @@ async function reviewHandler(ctx: TaskContext): Promise<TaskResult> {
 
 | 包含 | 不包含（Phase 2+）|
 |------|-------------------|
-| codex-worker + review-worker | claude-worker |
+| code-worker + review-worker | code-worker |
 | 单任务串行处理 | 并发任务处理 |
 | CLI runtime 调用 | Agent runtime（OpenHands）|
 | 基础证据上报 | 精细化 reasoning checkpoint |

@@ -64,9 +64,9 @@ interface ExecuteResult {
 ```mermaid
 flowchart TB
   subgraph Workers["Worker Handler"]
-    CW["Codex Worker"]
+    CW["Code Worker"]
     RW["Review Worker"]
-    CLW["Claude Worker"]
+    CLW["Code Worker"]
   end
 
   subgraph RuntimePkg["packages/runtime"]

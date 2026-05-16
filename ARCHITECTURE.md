@@ -139,9 +139,9 @@ flowchart TB
     end
 
     subgraph Workers["执行面 (workers/)"]
-        CW["Codex Worker<br/>workers/codex-worker"]
+        CW["Code Worker<br/>workers/code-worker"]
         RW["Review Worker<br/>workers/review-worker"]
-        CLW["Claude Worker<br/>workers/claude-worker"]
+        CLW["Code Worker<br/>workers/code-worker"]
     end
 
     subgraph Experiment["实验与评估"]
@@ -170,22 +170,18 @@ flowchart TB
     S <--> DB
     S --> CW
     S --> RW
-    S --> CLW
     S --> ATT
     
     SDK --> CW
     SDK --> RW
-    SDK --> CLW
     
     CW --> R
     RW --> R
-    CLW --> R
     R --> OH
     OH --> SB
     
     CW --> A
     RW --> A
-    CLW --> A
     ATT --> OBS
     A <--> DB
     A <--> FS
@@ -206,9 +202,9 @@ flowchart TB
 | Artifact | `packages/artifact` | 产物存储、元数据管理 | - |
 | Runtime | `packages/runtime` | 运行时抽象接口 | - |
 | **执行面** |
-| Codex Worker | `workers/codex-worker` | 代码修改和验证，产生 `worker_attempt` | worker-sdk, runtime, artifact |
+| Code Worker | `workers/code-worker` | 代码修改和验证，产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | Review Worker | `workers/review-worker` | 代码审查，产生 `worker_attempt` | worker-sdk, runtime, artifact |
-| Claude Worker | `workers/claude-worker` | 代码修改和验证（Claude Code 引擎），产生 `worker_attempt` | worker-sdk, runtime, artifact |
+| Code Worker | `workers/code-worker` | 代码修改和验证（Claude Code 引擎），产生 `worker_attempt` | worker-sdk, runtime, artifact |
 | **实验与评估** |
 | Version Set | `packages/worker-sdk`（类型）+ `infra/postgres`（持久化） | 运行身份快照（method + execution） | - |
 | Worker Attempt | `packages/worker-sdk`（类型）+ `packages/scheduler`（生命周期） | 单次执行主体，驱动观测与评分 | scheduler, worker-sdk |
@@ -229,7 +225,7 @@ sequenceDiagram
     participant User
     participant Orchestrator
     participant Scheduler
-    participant CodexWorker
+    participant CodeWorker
     participant ReviewWorker
     participant Runtime
     participant Artifact
@@ -241,24 +237,24 @@ sequenceDiagram
     Orchestrator->>Scheduler: 提交 code 任务
     Scheduler->>DB: 入队
     
-    CodexWorker->>Scheduler: claim task
+    CodeWorker->>Scheduler: claim task
     Scheduler->>DB: 创建 worker_attempt + 更新 lease
-    Scheduler-->>CodexWorker: 返回任务
+    Scheduler-->>CodeWorker: 返回任务
     
-    CodexWorker->>Runtime: 执行代码修改
-    Runtime-->>CodexWorker: 返回 patch
-    CodexWorker->>Artifact: 保存 patch
-    CodexWorker->>Eval: 上报 context / reasoning / tool / token / result
-    CodexWorker->>Scheduler: 完成任务
+    CodeWorker->>Runtime: 执行代码修改
+    Runtime-->>CodeWorker: 返回 patch
+    CodeWorker->>Artifact: 保存 patch
+    CodeWorker->>Eval: 上报 context / reasoning / tool / token / result
+    CodeWorker->>Scheduler: 完成任务
     
     Scheduler->>Orchestrator: 任务完成事件
     Orchestrator->>Scheduler: 提交 verify 任务
     
-    CodexWorker->>Scheduler: claim verify
-    CodexWorker->>Runtime: 运行验收命令
-    CodexWorker->>Artifact: 保存日志
-    CodexWorker->>Eval: 上报 verify attempt 证据
-    CodexWorker->>Scheduler: 完成验证
+    CodeWorker->>Scheduler: claim verify
+    CodeWorker->>Runtime: 运行验收命令
+    CodeWorker->>Artifact: 保存日志
+    CodeWorker->>Eval: 上报 verify attempt 证据
+    CodeWorker->>Scheduler: 完成验证
     
     Scheduler->>Orchestrator: 验证完成
     Orchestrator->>Scheduler: 提交 review 任务

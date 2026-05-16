@@ -52,7 +52,7 @@ flowchart TB
     end
 
     subgraph Workers["workers/*"]
-        CW["Codex Worker"]
+        CW["Code Worker"]
         RW["Review Worker"]
         KW["Kiro Worker"]
     end
@@ -617,7 +617,7 @@ expect(ctx.evidence.events).toHaveLength(3);
 ## 适用范围
 
 - `packages/worker-sdk`：本文档的主体实现
-- `workers/codex-worker`、`workers/review-worker`、`workers/claude-worker`：SDK 消费者
+- `workers/code-worker`、`workers/review-worker`、`workers/code-worker`：SDK 消费者
 - `packages/scheduler`：仅导入 SDK 类型定义，实现执行协议的服务端
 - `packages/runtime`：与 SDK 平级，Worker 同时依赖两者但两者互不依赖
 

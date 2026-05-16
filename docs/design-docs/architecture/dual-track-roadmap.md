@@ -108,7 +108,7 @@ verified:
 
 #### Phase 2: Robust Execution + Operator UX
 
-- 交付：更稳的调度、Claude Worker、基础人工介入、主操作视图
+- 交付：更稳的调度、Code Worker、基础人工介入、主操作视图
 - 实验：experiment batch、benchmark 管理、attempt review、聚合评分
 
 #### Phase 3: Full Evaluation & Optimization Loop

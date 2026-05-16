@@ -8,6 +8,7 @@
 |----|------|--------|-------|----------|------|
 | `dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `architecture/dual-track-roadmap.md` |
 | `attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `architecture/attempt-observability-evaluation.md` |
+| `tech-choices` | 技术选型决策 | draft | evan | 框架评估、Worker 命名规范、平台核心价值 | `architecture/tech-choices.md` |
 
 ## 模块设计文档 (`modules/`)
 

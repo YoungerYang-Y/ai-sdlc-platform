@@ -43,7 +43,7 @@ flowchart TB
     end
 
     subgraph Workers["Worker 进程"]
-        W1["Codex Worker"]
+        W1["Code Worker"]
         W2["Review Worker"]
     end
 

@@ -1,5 +1,5 @@
 {
-  "name": "@ai-sdlc/claude-worker",
+  "name": "@ai-sdlc/code-worker",
   "version": "0.0.0",
   "private": true,
   "type": "module",

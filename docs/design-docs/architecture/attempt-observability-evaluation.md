@@ -552,7 +552,7 @@ type CalibrationReason = {
 - 第一版通过 capability flag 区分：
   - `attempt_observability_v1`
   - `attempt_evaluation_v1`
-- 发布按 `worker_type` 分批启用：先 `codex-worker`，后 `review-worker`
+- 发布按 `worker_type` 分批启用：先 `code-worker`，后 `review-worker`
 - 回滚通过 feature flag 关闭，不删除已落库证据和 scorecard revision
 
 ## 适用范围
@@ -562,7 +562,7 @@ type CalibrationReason = {
 - `packages/worker-sdk`：attempt 观测协议类型定义
 - `packages/scheduler`：attempt 生命周期与观测状态机衔接
 - `packages/artifact`：证据载荷存储
-- `workers/codex-worker`、`workers/review-worker`：证据上报实现
+- `workers/code-worker`、`workers/review-worker`：证据上报实现
 - `apps/orchestrator`：评估触发与 scorecard 消费
 
 ### 实现涉及（需要改动的模块）
@@ -571,7 +571,7 @@ type CalibrationReason = {
 - `packages/scheduler`
 - `packages/artifact`
 - `packages/runtime`
-- `workers/codex-worker`
+- `workers/code-worker`
 - `workers/review-worker`
 - `apps/orchestrator`
 - `apps/dashboard`
