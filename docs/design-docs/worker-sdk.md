@@ -248,6 +248,7 @@ interface WorkerConfig {
   scheduler: { baseUrl: string; pollIntervalMs: number };
   observability: { baseUrl: string; flushIntervalMs?: number; flushBatchSize?: number };
   logger?: Logger;
+  maxConcurrent?: number; // Phase 1 始终为 1，Phase 2 支持并发
 }
 
 interface TaskContext {
@@ -268,11 +269,16 @@ interface TaskResult {
 
 type ExecuteHandler = (ctx: TaskContext) => Promise<TaskResult>;
 
+interface WorkerStopOptions {
+  /** 等待当前任务完成的最大时间，超时后强制 abort */
+  gracePeriodMs?: number; // 默认 30000
+}
+
 function createWorker(config: WorkerConfig, handler: ExecuteHandler): Worker;
 
 interface Worker {
   start(): Promise<void>;
-  stop(): Promise<void>;
+  stop(options?: WorkerStopOptions): Promise<void>;
 }
 ```
 
@@ -284,6 +290,67 @@ interface Worker {
 4. 根据返回值调用 scheduler.complete() 或 scheduler.fail()
 5. 发送 attempt_summary_report
 6. 停止 LeaseManager，继续循环
+
+### Graceful Shutdown
+
+`stop()` 调用后行为：
+1. 停止 poll 新任务
+2. 等待当前 handler 完成（最多 gracePeriodMs，默认 30000）
+3. 超时触发 AbortSignal
+4. 上报 fail（failureType: "cancelled"）
+5. 退出
+
+### 进程信号处理
+
+SDK 框架通过 `createWorker` 自动注册：
+- `SIGTERM` → `worker.stop({ gracePeriodMs: 30000 })`
+- `SIGINT` → `worker.stop({ gracePeriodMs: 5000 })`
+
+### 架构图
+
+```mermaid
+flowchart TB
+  subgraph WorkerProcess["Worker 进程"]
+    CW["createWorker(config, handler)"]
+    Loop["Worker Loop"]
+    LM["LeaseManager"]
+    EC["EvidenceCollector"]
+    SC["SchedulerClient"]
+    OC["ObservabilityClient"]
+  end
+
+  subgraph External["外部服务"]
+    Sched["Scheduler API"]
+    ObsSvc["Observability API"]
+  end
+
+  CW --> Loop
+  Loop -->|"1. poll"| SC
+  SC -->|"claim/heartbeat/complete/fail"| Sched
+  Loop -->|"2. manage lease"| LM
+  LM -->|"auto heartbeat"| SC
+  Loop -->|"3. call handler"| Handler["handler(ctx)"]
+  Handler -->|"ctx.evidence.append()"| EC
+  EC -->|"batch flush"| OC
+  OC -->|"POST evidence/summary"| ObsSvc
+  LM -->|"lease expired → abort"| Handler
+```
+
+### Worker 主循环状态机
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Polling: start()
+  Polling --> Idle: no task (sleep pollInterval)
+  Polling --> Executing: claimed task
+  Executing --> Reporting: handler returned
+  Reporting --> Polling: complete/fail sent
+  Executing --> Failed: lease expired / abort
+  Failed --> Polling: fail sent
+  Polling --> [*]: stop()
+  Executing --> [*]: stop() + gracePeriod expired
+```
 
 导出层次：
 
@@ -317,6 +384,7 @@ interface ClaimRequest {
   supportedTaskTypes: TaskType[];
   implementation: WorkerImplementation;
   versionSetId: string;
+  maxConcurrent?: number; // Phase 1 始终为 1，Phase 2 支持并发
 }
 
 interface ClaimResponse {

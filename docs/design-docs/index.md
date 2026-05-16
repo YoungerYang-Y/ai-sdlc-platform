@@ -1,12 +1,53 @@
 # 设计决策目录
 
-项目级通用设计决策。每个文档定义一个跨功能的设计主题（如缓存策略、幂等设计），智能体在相关领域编码前应先查阅。
+项目级通用设计决策。每个文档定义一个跨功能的设计主题，智能体在相关领域编码前应先查阅。
+
+## 架构级文档
 
 | id | 主题 | status | owner | 适用范围 | 路径 |
 |----|------|--------|-------|----------|------|
-| `arch-dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `docs/design-docs/arch-dual-track-roadmap.md` |
-| `arch-attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `docs/design-docs/arch-attempt-observability-evaluation.md` |
-| `worker-sdk` | Worker SDK 协议设计 | draft | evan | Worker 身份模型、执行协议、观测协议、框架循环 | `docs/design-docs/worker-sdk.md` |
+| `arch-dual-track-roadmap` | 双轨演进路线 | draft | evan | 路线图、核心对象模型、实验平台演进 | `arch-dual-track-roadmap.md` |
+| `arch-attempt-observability-evaluation` | Worker Attempt 观测与评估架构 | draft | evan | attempt 协议、观测状态机、评分与标签传播 | `arch-attempt-observability-evaluation.md` |
+
+## 模块设计文档
+
+| id | 模块 | 深度 | status | 路径 |
+|----|------|------|--------|------|
+| `artifact` | packages/artifact | 轻量 | draft | `artifact.md` |
+| `runtime` | packages/runtime | 轻量 | draft | `runtime.md` |
+| `worker-sdk` | packages/worker-sdk | 深度 | draft | `worker-sdk.md` |
+| `workflow` | packages/workflow | 轻量 | draft | `workflow.md` |
+| `scheduler` | packages/scheduler | 深度 | draft | `scheduler.md` |
+| `orchestrator` | apps/orchestrator | 深度 | draft | `orchestrator.md` |
+| `observability` | packages/observability | 深度 | draft | `observability.md` |
+| `workers` | workers/* | 轻量 | draft | `workers.md` |
+| `infra-postgres` | infra/postgres | 完整 DDL | draft | `infra-postgres.md` |
+
+## 接口依赖矩阵
+
+下表列出各模块导出的关键接口及其消费者：
+
+| 导出模块 | 导出接口 | 消费者 |
+|----------|----------|--------|
+| `worker-sdk` | `TaskType`, `WorkerRole`, `WorkerImplementation` | workflow, scheduler, workers, observability |
+| `worker-sdk` | `TaskRun`, `WorkerAttempt` (类型) | scheduler, orchestrator, observability |
+| `worker-sdk` | `createWorker`, `SchedulerClient`, `LeaseManager`, `EvidenceCollector` | workers |
+| `worker-sdk` | `Logger`, `ObservabilityReporter`, `TelemetryProvider` | workers, scheduler, orchestrator, observability |
+| `worker-sdk` | `AttemptEvidenceEvent`, `AttemptSummaryReport` | observability |
+| `workflow` | `WorkflowDefinition`, `StepDefinition`, `FailureStrategy` | orchestrator |
+| `workflow` | `getDefaultWorkflow()`, `getWorkflow(id)` | orchestrator |
+| `artifact` | `ArtifactStore` (interface) | workers, observability, orchestrator, evaluation |
+| `runtime` | `Runtime`, `RuntimeSession` (interface) | workers |
+| `scheduler` | HTTP API: `/tasks` (submit/cancel/query) | orchestrator |
+| `scheduler` | HTTP API: `/tasks/claim`, `/attempts/*` | workers (via SDK) |
+| `scheduler` | `SchedulerEvent` (callback payload) | orchestrator |
+| `scheduler` | `attempt_finished` 通知 | observability |
+| `orchestrator` | HTTP API: `/workflows` (create/query/cancel) | CLI / 外部调用者 |
+| `orchestrator` | HTTP API: `/callbacks/task-event` | scheduler |
+| `observability` | HTTP API: `/attempts/{id}/evidence`, `/attempts/{id}/summary` | workers (via SDK) |
+| `observability` | HTTP API: `/attempts/{id}/finished` | scheduler |
+| `observability` | HTTP API: `/attempts/{id}/status`, `/attempts/{id}/timeline` | evaluation, dashboard |
+| `infra-postgres` | DDL schema (共享表结构) | 所有模块（读写各自领域的表） |
 
 ## status 含义
 
@@ -24,7 +65,7 @@
 
 ## 如何添加
 
-1. 复制 `_template.md` 为 `{主题名}.md`（如 `cache-strategy.md`；架构 RFC 用 `arch-` 前缀）
+1. 复制 `_template.md` 为 `{主题名}.md`（架构 RFC 用 `arch-` 前缀）
 2. 填写 frontmatter 和所有章节
 3. 在上方目录表中添加条目
 4. status 设为 draft；落地验证后更新为 verified
