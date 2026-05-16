@@ -1,0 +1,19 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/worker-sdk" },
+    { "path": "packages/scheduler" },
+    { "path": "packages/workflow" },
+    { "path": "packages/artifact" },
+    { "path": "packages/runtime" },
+    { "path": "packages/observability" },
+    { "path": "packages/evaluation" },
+    { "path": "packages/insights" },
+    { "path": "apps/orchestrator" },
+    { "path": "apps/dashboard" },
+    { "path": "workers/code-worker" },
+    { "path": "workers/review-worker" },
+    { "path": "runtimes/openhands" },
+    { "path": "runtimes/sandbox" }
+  ]
+}
