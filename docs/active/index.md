@@ -8,6 +8,7 @@
 |------|------|------|----------|--------|
 | `phase1-minimal-loop` | Phase 1 最小双轨闭环 | ✅ shipped | 2026-05-16 | evan |
 | `phase2-real-worker` | Phase 2 真实 Code Worker 集成 | ✅ shipped | 2026-05-17 | evan |
+| `phase2-dashboard` | Phase 2 基础 Dashboard | 🚧 design | 2026-05-17 | evan |
 
 ---
 
