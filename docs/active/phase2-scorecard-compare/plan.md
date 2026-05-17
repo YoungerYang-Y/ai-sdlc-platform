@@ -22,7 +22,7 @@ updated: 2026-05-17
 ### T1: 后端 GET /scorecards/compare API
 - depends_on: []
 - scope: `apps/orchestrator/src/index.ts`
-- verify: `curl "http://localhost:8000/scorecards/compare?a=<id>&b=<id>"` 返回 JSON
+- verify: `cd apps/orchestrator && pnpm typecheck`
 - agent: main
 - status: todo
 - deliverable: 比较 API 端点

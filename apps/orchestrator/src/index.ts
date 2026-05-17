@@ -178,7 +178,7 @@ export function createOrchestrator(config: OrchestratorConfig) {
         FROM worker_attempts wa
         JOIN task_runs tr ON tr.id = wa.task_run_id
         LEFT JOIN attempt_summary_reports asr ON asr.attempt_id = wa.id
-        WHERE tr.workflow_run_id = ${workflowId} AND wa.status = 'completed'
+        WHERE tr.workflow_run_id = ${workflowId} AND wa.status IN ('completed', 'failed')
         ORDER BY wa.finished_at DESC LIMIT 1
       `;
       if (!attempt) return { workflowId, implementation: null, status: null, durationMs: null, scorecard: null };

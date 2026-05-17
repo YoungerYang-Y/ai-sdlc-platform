@@ -46,9 +46,11 @@ GET /scorecards/compare?a=<workflowId>&b=<workflowId>
 
 查询逻辑：
 1. 通过 workflowId 找到关联的 worker_attempts
-2. 取最新 completed 的 attempt 的 scorecard_revision
+2. 取最新 attempt（按 finished_at DESC，不限制 completed/failed）的 scorecard_revision
 3. 从 attempt_summary_reports 取 implementation 和 durationMs
 4. 如果无 scorecard，对应字段返回 null
+
+语义说明："最终 attempt"= 时间上最新的有 scorecard 的 attempt，包括 failed（failed attempt 也有 scorecard，success=0）。
 
 ### Dashboard 页面
 

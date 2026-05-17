@@ -73,7 +73,7 @@ Phase 1 验收标准 #7 要求"同一任务两个 version_set 的 scorecard 可�
 
 ## 产品约束
 
-- 对比单位是 workflow 级别（取该 workflow 下所有 attempt 的最优 scorecard）
+- 对比单位是 workflow 级别（取该 workflow 下最终 attempt 的 scorecard）
 - 不涉及数据库 schema 变更
 
 ## 度量
