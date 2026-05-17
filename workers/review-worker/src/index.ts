@@ -1,6 +1,7 @@
 import { createWorker, type TaskContext, type TaskResult } from "@ai-sdlc/worker-sdk";
 import { CliRuntime } from "@ai-sdlc/runtime";
 import { FileSystemArtifactStore } from "@ai-sdlc/artifact";
+import { resolveCliCommand } from "./cli-resolver.js";
 import { writeFile, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -11,8 +12,8 @@ const mock = process.argv.includes("--mock");
 const runtime = new CliRuntime();
 const artifactStore = new FileSystemArtifactStore({ basePath: process.env.ARTIFACT_PATH ?? "./artifacts" });
 
-async function handler(ctx: TaskContext): Promise<TaskResult> {
-  const { taskRun, evidence, abortSignal, logger } = ctx;
+export async function handler(ctx: TaskContext): Promise<TaskResult> {
+  const { taskRun, evidence, logger } = ctx;
   const params = taskRun.params as Record<string, unknown> | null;
   const requirement = (params?.requirement as string) ?? "";
 
@@ -58,29 +59,25 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
 
   evidence.append("context_loaded", { requirement, patchLoaded: patchRefs.length > 0, patchSize: patchContent.length });
 
-  // Write patch to temp file for CLI context
+  // Write patch to temp file — CLI reads from file, not inline
   const tmpDir = await mkdtemp(join(tmpdir(), "review-"));
   const patchFile = join(tmpDir, "patch.diff");
   await writeFile(patchFile, patchContent);
 
   const prompt = patchContent
-    ? `Review this code change for the requirement: "${requirement}"\n\nPatch file at: ${patchFile}\n\n${patchContent.slice(0, 4000)}`
+    ? `Review the code change in ${patchFile} for the requirement: "${requirement}"`
     : `Review code changes for: ${requirement}`;
 
-  // Use Kiro CLI with fallback
-  const { resolveCliCommand } = await import("../src/cli-resolver.js" as any).catch(() => ({ resolveCliCommand: null }));
-  let cmd: string[];
-  if (resolveCliCommand) {
-    const cli = await resolveCliCommand(implementation);
-    cmd = [...cli.command, prompt];
-  } else {
-    cmd = ["kiro", "chat", "--no-interactive", "--trust-all-tools", prompt];
-  }
+  // Resolve CLI
+  const cli = await resolveCliCommand(implementation);
+  logger.info("cli resolved", { name: cli.name });
+
+  const cmd = [...cli.command, prompt];
 
   const session = await runtime.createSession({ runtimeType: "cli", workDir: process.cwd(), timeout: taskRun.timeoutMs, abortSignal });
   try {
     const result = await session.execute({ command: cmd });
-    evidence.append("tool_called", { toolName: implementation, status: result.status, durationMs: result.durationMs });
+    evidence.append("tool_called", { toolName: cli.name, status: result.status, durationMs: result.durationMs });
 
     if (result.status !== "success") {
       return { status: "failed", failureType: "business_error", failureReason: result.stderr || `exit ${result.exitCode}` };
@@ -101,21 +98,24 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
   }
 }
 
-export { handler };
+// --- Entrypoint (only runs when executed directly) ---
+async function main() {
+  const worker = createWorker(
+    {
+      workerId: process.env.WORKER_ID ?? `review-worker-${process.pid}`,
+      roles: ["review"],
+      implementation,
+      supportedTaskTypes: ["review"],
+      versionSetId: process.env.VERSION_SET_ID ?? "00000000-0000-0000-0000-000000000001",
+      scheduler: { baseUrl: process.env.SCHEDULER_URL ?? "http://localhost:8000", pollIntervalMs: 3000 },
+      observability: { baseUrl: process.env.OBSERVABILITY_URL ?? "http://localhost:8002" },
+    },
+    handler,
+  );
 
-const worker = createWorker(
-  {
-    workerId: process.env.WORKER_ID ?? `review-worker-${process.pid}`,
-    roles: ["review"],
-    implementation,
-    supportedTaskTypes: ["review"],
-    versionSetId: process.env.VERSION_SET_ID ?? "00000000-0000-0000-0000-000000000001",
-    scheduler: { baseUrl: process.env.SCHEDULER_URL ?? "http://localhost:8000", pollIntervalMs: 3000 },
-    observability: { baseUrl: process.env.OBSERVABILITY_URL ?? "http://localhost:8002" },
-  },
-  handler,
-);
+  worker.start();
+  process.on("SIGTERM", () => void worker.stop());
+  process.on("SIGINT", () => void worker.stop());
+}
 
-worker.start();
-process.on("SIGTERM", () => void worker.stop());
-process.on("SIGINT", () => void worker.stop());
+main().catch(console.error);

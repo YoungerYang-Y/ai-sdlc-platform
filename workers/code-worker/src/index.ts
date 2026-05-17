@@ -169,9 +169,11 @@ async function gitDiff(cwd: string): Promise<string> {
 
   let patch = tracked;
   if (untracked.trim()) {
-    // Stage untracked files to include them in diff
-    await execVoid("git", ["add", "-N", ...untracked.trim().split("\n")], cwd);
+    const files = untracked.trim().split("\n");
+    // Stage untracked files to include in diff, then clean up
+    await execVoid("git", ["add", "-N", ...files], cwd);
     patch = await execOutput("git", ["diff", "HEAD"], cwd);
+    await execVoid("git", ["reset", "HEAD", "--", ...files], cwd);
   }
   return patch;
 }
@@ -220,4 +222,8 @@ async function main() {
 // Export handler for testing
 export { handler, workspace, delivery, artifactStore };
 
-main().catch(console.error);
+// Only run main when executed directly (not when imported for testing)
+const isMain = process.argv[1]?.includes("code-worker");
+if (isMain) {
+  main().catch(console.error);
+}
