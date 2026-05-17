@@ -9,6 +9,13 @@ export function createSql(connectionString: string): postgres.Sql {
   return postgres(connectionString);
 }
 
+/** 仅供 SchedulerRepository 内部使用，启用 camelCase 自动转换 */
+export function createCamelSql(connectionString: string): postgres.Sql {
+  return postgres(connectionString, {
+    transform: postgres.camel,
+  });
+}
+
 export class SchedulerRepository {
   constructor(private sql: Sql) {}
 
@@ -122,37 +129,19 @@ export class SchedulerRepository {
 
   private mapTaskRun(row: any): TaskRun {
     return {
-      id: row.id,
-      workflowRunId: row.workflow_run_id,
-      taskType: row.task_type,
-      status: row.status,
-      priority: row.priority,
-      maxAttempts: row.max_attempts,
-      currentAttemptCount: row.current_attempt_count,
-      timeoutMs: row.timeout_ms,
-      params: row.params,
-      createdAt: row.created_at?.toISOString?.() ?? row.created_at,
-      updatedAt: row.updated_at?.toISOString?.() ?? row.updated_at,
+      ...row,
+      createdAt: row.createdAt?.toISOString?.() ?? row.createdAt,
+      updatedAt: row.updatedAt?.toISOString?.() ?? row.updatedAt,
     };
   }
 
   private mapAttempt(row: any): WorkerAttempt {
     return {
-      id: row.id,
-      taskRunId: row.task_run_id,
-      workerId: row.worker_id,
-      implementation: row.implementation,
-      versionSetId: row.version_set_id,
-      status: row.status,
-      attemptNumber: row.attempt_number,
-      leaseToken: row.lease_token,
-      leaseExpiresAt: row.lease_expires_at?.toISOString?.() ?? row.lease_expires_at,
-      lastHeartbeatAt: row.last_heartbeat_at?.toISOString?.() ?? row.last_heartbeat_at,
-      startedAt: row.started_at?.toISOString?.() ?? row.started_at,
-      finishedAt: row.finished_at?.toISOString?.() ?? row.finished_at,
-      failureType: row.failure_type,
-      failureReason: row.failure_reason,
-      wasOrphaned: row.was_orphaned,
+      ...row,
+      leaseExpiresAt: row.leaseExpiresAt?.toISOString?.() ?? row.leaseExpiresAt,
+      lastHeartbeatAt: row.lastHeartbeatAt?.toISOString?.() ?? row.lastHeartbeatAt,
+      startedAt: row.startedAt?.toISOString?.() ?? row.startedAt,
+      finishedAt: row.finishedAt?.toISOString?.() ?? row.finishedAt,
     };
   }
 }

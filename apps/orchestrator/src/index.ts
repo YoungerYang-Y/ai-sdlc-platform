@@ -157,6 +157,11 @@ export function createOrchestrator(config: OrchestratorConfig) {
     return c.json(row);
   });
 
+  app.get("/workflows/:id/tasks", async (c) => {
+    const tasks = await scheduler.listTasksByWorkflow(c.req.param("id"));
+    return c.json(tasks);
+  });
+
   app.get("/workflows", async (c) => {
     const status = c.req.query("status");
     const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
@@ -206,8 +211,11 @@ export function createOrchestrator(config: OrchestratorConfig) {
   app.get("/artifacts/:type/:workflowId", async (c) => {
     const type = c.req.param("type");
     const workflowId = c.req.param("workflowId");
-    if (!type || !workflowId || workflowId.includes("..")) {
-      return c.json({ error: "invalid artifact ref", debug: { type, workflowId } }, 400);
+    // 严格格式校验防止路径遍历（包括 URL 编码绕过）
+    const VALID_TYPE = /^[a-z_]+$/;
+    const VALID_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+    if (!type || !workflowId || !VALID_TYPE.test(type) || !VALID_ID.test(workflowId)) {
+      return c.json({ error: "invalid artifact ref" }, 400);
     }
     const { resolve, join } = await import("node:path");
     const { readFile, readdir } = await import("node:fs/promises");

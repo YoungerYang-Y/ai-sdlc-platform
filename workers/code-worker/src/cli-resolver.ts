@@ -10,18 +10,20 @@ const CLI_CONFIGS: Record<string, { check: string; command: string[] }> = {
   codex: { check: "codex", command: ["codex", "--quiet", "--task"] },
 };
 
-let cached: CliResolution | null = null;
+let cached = new Map<string, CliResolution>();
 
 export async function resolveCliCommand(preferred: string = "kiro"): Promise<CliResolution> {
-  if (cached) return cached;
+  const hit = cached.get(preferred);
+  if (hit) return hit;
 
   const order = preferred === "kiro" ? ["kiro", "codex"] : ["codex", "kiro"];
 
   for (const name of order) {
     const config = CLI_CONFIGS[name]!;
     if (await isInPath(config.check)) {
-      cached = { name, command: config.command };
-      return cached;
+      const resolution: CliResolution = { name, command: config.command };
+      cached.set(preferred, resolution);
+      return resolution;
     }
   }
 
@@ -29,5 +31,5 @@ export async function resolveCliCommand(preferred: string = "kiro"): Promise<Cli
 }
 
 export function resetCliCache(): void {
-  cached = null;
+  cached = new Map();
 }

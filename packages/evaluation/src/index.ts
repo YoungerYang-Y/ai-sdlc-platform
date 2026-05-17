@@ -3,6 +3,14 @@ import postgres from "postgres";
 export interface EvaluationConfig {
   connectionString: string;
   pollIntervalMs?: number;
+  /** efficiency 满分线（毫秒），默认 600000 (10min) */
+  efficiencyBaselineMs?: number;
+  /** efficiency 零分线（毫秒），默认 3600000 (60min) */
+  efficiencyMaxMs?: number;
+  /** cost 满分线（token 数），默认 1000 */
+  costBaselineTokens?: number;
+  /** cost 零分线（token 数），默认 100000 */
+  costMaxTokens?: number;
 }
 
 interface DimensionScores {
@@ -73,20 +81,18 @@ export function createEvaluation(config: EvaluationConfig) {
       return { success: 0, efficiency: 0.5, cost: 0.5 };
     }
 
-    // Success: 1.0 if completed, 0.0 if failed
     const success = summary.final_status === "completed" ? 1.0 : 0.0;
 
-    // Phase 1 临时阈值：mock 模式下 attempt 执行 ~100ms，远低于 10min 满分线，会得满分。
-    // 生产环境需根据实际基线重新校准。
+    const effBaseline = config.efficiencyBaselineMs ?? 600000;
+    const effMax = config.efficiencyMaxMs ?? 3600000;
+    const durationMs = Number(summary.duration_ms ?? effBaseline);
+    const efficiency = Math.max(0, Math.min(1, 1 - (durationMs - effBaseline) / (effMax - effBaseline)));
 
-    // Efficiency: inverse of duration (cap at 10min = 1.0, 60min = 0.0)
-    const durationMs = Number(summary.duration_ms ?? 600000);
-    const efficiency = Math.max(0, Math.min(1, 1 - (durationMs - 600000) / 3000000));
-
-    // Cost: inverse of token usage (cap at 1k tokens = 1.0, 100k = 0.0)
+    const costBaseline = config.costBaselineTokens ?? 1000;
+    const costMax = config.costMaxTokens ?? 100000;
     const tokenTotals = summary.token_totals as { total?: number } | null;
     const tokens = tokenTotals?.total ?? 10000;
-    const cost = Math.max(0, Math.min(1, 1 - (tokens - 1000) / 99000));
+    const cost = Math.max(0, Math.min(1, 1 - (tokens - costBaseline) / (costMax - costBaseline)));
 
     return { success, efficiency, cost };
   }

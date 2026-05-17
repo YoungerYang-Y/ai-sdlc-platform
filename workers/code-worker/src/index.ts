@@ -232,7 +232,9 @@ async function main() {
 export { handler, workspace, delivery, artifactStore };
 
 // Only run main when executed directly (not when imported for testing)
-const isMain = process.argv[1]?.includes("code-worker");
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+const isMain = fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? "");
 if (isMain) {
   main().catch(console.error);
 }

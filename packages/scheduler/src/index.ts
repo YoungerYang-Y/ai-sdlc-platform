@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { TaskRun, WorkerAttempt, TaskType, ClaimRequest, ClaimResponse, FailureType } from "@ai-sdlc/worker-sdk";
-import { SchedulerRepository, createSql } from "./repository.js";
+import { SchedulerRepository, createCamelSql } from "./repository.js";
 
 export interface SchedulerConfig {
   connectionString: string;
@@ -38,7 +38,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   const leaseScanIntervalMs = config.leaseScanIntervalMs ?? 30000;
   const defaultMaxAttempts = config.defaultMaxAttempts ?? 3;
 
-  const sql = createSql(config.connectionString);
+  const sql = createCamelSql(config.connectionString);
   const repo = new SchedulerRepository(sql);
   let scanTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -57,7 +57,9 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   }
 
   async function handleClaim(req: ClaimRequest): Promise<ClaimResponse | null> {
-    return sql.begin(async (tx) => {
+    return sql.begin("READ COMMITTED", async (tx) => {
+      // 事务级超时保护，防止长时间持有锁
+      await tx`SET LOCAL statement_timeout = '5s'`;
       const txRepo = new SchedulerRepository(tx);
       const taskRun = await txRepo.findAndLockReadyTask(req.supportedTaskTypes);
       if (!taskRun) return null;

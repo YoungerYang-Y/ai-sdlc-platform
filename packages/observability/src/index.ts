@@ -83,11 +83,18 @@ export function createObservability(config: ObservabilityConfig) {
 
     await ensureRecord(attemptId);
 
-    // TODO: Phase 2 — 使用 UNNEST 批量插入或 CTE 替代逐条 INSERT，提升大批量性能
-    for (const event of events) {
+    if (events.length > 0) {
       await sql`
         INSERT INTO attempt_evidence_events (event_id, attempt_id, sequence_no, event_type, occurred_at, payload_ref, payload_inline)
-        VALUES (${event.eventId}, ${attemptId}, ${event.sequenceNo}, ${event.eventType}, ${event.occurredAt}, ${event.payloadRef ?? null}, ${sql.json(event.payload as any ?? null)})
+        SELECT * FROM UNNEST(
+          ${sql.array(events.map(e => e.eventId))}::text[],
+          ${sql.array(events.map(() => attemptId))}::text[],
+          ${sql.array(events.map(e => e.sequenceNo))}::int[],
+          ${sql.array(events.map(e => e.eventType))}::text[],
+          ${sql.array(events.map(e => e.occurredAt))}::timestamptz[],
+          ${sql.array(events.map(e => e.payloadRef ?? null))}::text[],
+          ${sql.array(events.map(e => e.payload != null ? JSON.stringify(e.payload) : null))}::jsonb[]
+        )
         ON CONFLICT (event_id) DO NOTHING
       `;
     }

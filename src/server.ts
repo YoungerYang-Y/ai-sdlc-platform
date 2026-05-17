@@ -2,6 +2,13 @@
  * Process entry point — composition root that wires orchestrator, workers, and infrastructure.
  * This file lives at the project root level and can import from any package.
  * Run with: npx tsx src/server.ts (or from Docker)
+ *
+ * 部署模型说明：
+ * - 当前为 "all-in-one" 单进程模式，orchestrator + observability + evaluation 运行在同一进程。
+ * - Worker（code-worker / review-worker）设计为独立进程运行，通过 HTTP 与 orchestrator 通信。
+ * - 此文件实例化的 WorkspaceManager / DeliveryManager / ArtifactStore 仅用于 orchestrator
+ *   回调中的 PR delivery，不与 worker 进程共享。Worker 进程各自实例化自己的依赖。
+ * - 若后续切换为 worker in-process 模式，应通过依赖注入共享实例，而非各自 new。
  */
 import { createOrchestrator } from "../apps/orchestrator/src/index.js";
 import { createObservability } from "../packages/observability/src/index.js";
@@ -46,10 +53,11 @@ const orchestrator = createOrchestrator({
           if (result.prUrl) console.log(`PR created: ${result.prUrl}`);
           if (result.error) console.warn(`PR creation failed (best-effort): ${result.error}`);
         } catch (err) { console.error("delivery failed", err); }
+        finally { workspace.release(run.id); }
       })();
+    } else {
+      void workspace.release(run.id);
     }
-    // Workspace cleanup
-    void workspace.release(run.id);
   },
   onWorkflowFailed: (run) => {
     void workspace.release(run.id);

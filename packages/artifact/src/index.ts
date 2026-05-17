@@ -1,5 +1,5 @@
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, writeFile, readFile, rm, readdir, stat } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 
 // --- Interfaces ---
 
@@ -52,11 +52,51 @@ export interface FileSystemStoreConfig {
 
 export class FileSystemArtifactStore implements ArtifactStore {
   private basePath: string;
-  // TODO: Phase 2 — 元数据持久化到 PostgreSQL artifacts 表，当前进程重启后丢失
   private metadata = new Map<string, ArtifactMetadata>();
 
   constructor(config: FileSystemStoreConfig) {
     this.basePath = config.basePath;
+    // 启动时异步重建索引
+    void this.rebuildIndex().catch((err) => console.warn("artifact index rebuild failed", err));
+  }
+
+  /** 扫描文件系统重建内存索引，使进程重启后 list()/read() 不丢失 */
+  async rebuildIndex(): Promise<void> {
+    const ARTIFACT_TYPES: ArtifactType[] = ["patch", "log", "review_report", "reasoning_payload", "evidence_payload"];
+    for (const type of ARTIFACT_TYPES) {
+      const typeDir = join(this.basePath, type);
+      const typeStat = await stat(typeDir).catch(() => null);
+      if (!typeStat?.isDirectory()) continue;
+      const workflows = await readdir(typeDir);
+      for (const wfId of workflows) {
+        const wfDir = join(typeDir, wfId);
+        const wfStat = await stat(wfDir).catch(() => null);
+        if (!wfStat?.isDirectory()) continue;
+        await this.scanDir(wfDir, type, wfId);
+      }
+    }
+  }
+
+  private async scanDir(dir: string, artifactType: ArtifactType, workflowRunId: string): Promise<void> {
+    const entries = await readdir(dir);
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      const s = await stat(full);
+      if (s.isDirectory()) {
+        await this.scanDir(full, artifactType, workflowRunId);
+      } else if (s.isFile()) {
+        const ref = relative(this.basePath, full);
+        if (!this.metadata.has(ref)) {
+          this.metadata.set(ref, {
+            artifactType,
+            workflowRunId,
+            filename: entry,
+            mimeType: inferMimeType(entry),
+            sizeBytes: s.size,
+          });
+        }
+      }
+    }
   }
 
   async write(params: WriteParams): Promise<string> {
@@ -103,4 +143,11 @@ function buildRef(m: ArtifactMetadata): string {
   if (m.taskRunId) parts.push(m.taskRunId);
   parts.push(m.filename);
   return parts.join("/");
+}
+
+function inferMimeType(filename: string): string {
+  const ext = filename.split(".").pop();
+  if (ext === "md") return "text/markdown";
+  if (ext === "diff") return "text/x-diff";
+  return "text/plain";
 }

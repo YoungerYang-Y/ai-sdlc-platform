@@ -55,11 +55,9 @@ export async function fetchWorkflow(id: string): Promise<WorkflowDetail> {
 }
 
 export async function fetchTasks(workflowId: string): Promise<TaskRun[]> {
-  // Tasks are embedded in workflow query via separate endpoint
-  // For now, we use a direct DB query endpoint — simplified: fetch from /tasks?workflow_run_id=
-  // Actually not available yet, so we'll get task info from attempts
-  // TODO: Add GET /tasks?workflow_run_id= API
-  return [];
+  const res = await fetch(`${BASE}/workflows/${workflowId}/tasks`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
 }
 
 export async function fetchArtifact(ref: string): Promise<string> {

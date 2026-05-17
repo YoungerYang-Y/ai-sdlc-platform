@@ -18,6 +18,10 @@ export function createWorker(config: WorkerConfig, handler: (ctx: TaskContext) =
   let abortController: AbortController | null = null;
 
   async function loop(): Promise<void> {
+    const baseInterval = config.scheduler.pollIntervalMs ?? 5000;
+    const maxInterval = baseInterval * 8;
+    let consecutiveEmpty = 0;
+
     while (running) {
       const claim = await scheduler.claim({
         workerId: config.workerId,
@@ -30,10 +34,13 @@ export function createWorker(config: WorkerConfig, handler: (ctx: TaskContext) =
       });
 
       if (!claim) {
-        await sleep(config.scheduler.pollIntervalMs ?? 5000);
+        consecutiveEmpty++;
+        const backoff = Math.min(baseInterval * Math.pow(2, consecutiveEmpty - 1), maxInterval);
+        await sleep(backoff);
         continue;
       }
 
+      consecutiveEmpty = 0;
       await executeAttempt(claim, handler, scheduler, obsClient, logger, config);
     }
   }

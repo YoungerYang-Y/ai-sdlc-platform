@@ -112,7 +112,9 @@ async function main() {
   process.on("SIGINT", () => void worker.stop());
 }
 
-const isMain = process.argv[1]?.includes("review-worker");
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+const isMain = fileURLToPath(import.meta.url) === resolve(process.argv[1] ?? "");
 if (isMain) {
   main().catch(console.error);
 }

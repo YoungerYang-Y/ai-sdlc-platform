@@ -21,13 +21,13 @@ describe("cliResolver", () => {
   });
 
   it("detects kiro when available in PATH", async () => {
-    writeFileSync(join(mockBinDir, "kiro"), "#!/bin/sh\nexit 0");
-    chmodSync(join(mockBinDir, "kiro"), 0o755);
-    process.env.PATH = `${mockBinDir}:${originalPath}`;
+    writeFileSync(join(mockBinDir, "kiro-cli"), "#!/bin/sh\nexit 0");
+    chmodSync(join(mockBinDir, "kiro-cli"), 0o755);
+    process.env.PATH = `${mockBinDir}:/usr/bin`;
 
     const result = await resolveCliCommand("kiro");
     expect(result.name).toBe("kiro");
-    expect(result.command[0]).toBe("kiro");
+    expect(result.command[0]).toBe("kiro-cli");
   });
 
   it("falls back to codex when kiro not available", async () => {
@@ -46,9 +46,9 @@ describe("cliResolver", () => {
   });
 
   it("caches result after first call", async () => {
-    writeFileSync(join(mockBinDir, "kiro"), "#!/bin/sh\nexit 0");
-    chmodSync(join(mockBinDir, "kiro"), 0o755);
-    process.env.PATH = `${mockBinDir}:${originalPath}`;
+    writeFileSync(join(mockBinDir, "kiro-cli"), "#!/bin/sh\nexit 0");
+    chmodSync(join(mockBinDir, "kiro-cli"), 0o755);
+    process.env.PATH = `${mockBinDir}:/usr/bin`;
 
     const r1 = await resolveCliCommand("kiro");
     const r2 = await resolveCliCommand("kiro");
