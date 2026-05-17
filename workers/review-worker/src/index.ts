@@ -53,19 +53,9 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
   const params = taskRun.params as Record<string, unknown> | null;
   const workDir = (params?.workDir as string) ?? process.cwd();
 
-  // Load patch from previous code step
-  const patchRefs = await artifactStore.list({ workflowRunId: taskRun.workflowRunId, artifactType: "patch" });
-  let patchContent = "";
-  if (patchRefs.length > 0) {
-    const artifact = await artifactStore.read(patchRefs[0]!);
-    patchContent = artifact.data.toString("utf-8");
-  }
+  evidence.append("context_loaded", { requirement, workDir });
 
-  evidence.append("context_loaded", { requirement, patchLoaded: patchRefs.length > 0, patchSize: patchContent.length });
-
-  const prompt = patchContent
-    ? `Review this code change for the requirement: "${requirement}"\n\n\`\`\`diff\n${patchContent}\n\`\`\``
-    : `Review code changes for: ${requirement}`;
+  const prompt = `审查最新 commit 的代码变更。需求是："${requirement}"。请评估代码质量、正确性和是否满足需求。`;
 
   // Resolve CLI
   const cli = await resolveCliCommand(implementation);
@@ -95,7 +85,7 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
     });
 
     evidence.append("artifact_written", { ref });
-    const conclusion = report.includes("APPROVED") || report.includes("approved") ? "APPROVED" : "CHANGES_REQUESTED";
+    const conclusion = report.includes("APPROVED") || report.includes("approved") || report.includes("通过") ? "APPROVED" : "CHANGES_REQUESTED";
     return { status: "completed", artifactRefs: [ref], finalConclusion: conclusion };
   } finally {
     await session.destroy();

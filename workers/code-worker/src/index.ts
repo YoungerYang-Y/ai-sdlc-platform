@@ -93,11 +93,16 @@ async function handleCode(ctx: TaskContext, requirement: string, repository?: st
       return { status: "failed", failureType: "business_error", failureReason: result.stderr || `exit ${result.exitCode}` };
     }
 
-    // Extract git diff
+    // Extract git diff (for artifact storage)
     const patch = await gitDiff(ws.path);
     if (!patch) {
       return { status: "failed", failureType: "business_error", failureReason: "no changes generated" };
     }
+
+    // Commit locally (for review step to inspect in-repo)
+    const commitMsg = `ai-sdlc(code): ${requirement.slice(0, 50)}\n\nWorkflow: ${taskRun.workflowRunId}`;
+    await execVoid("git", ["add", "-A"], ws.path);
+    await execVoid("git", ["commit", "-m", commitMsg], ws.path);
 
     const ref = await artifactStore.write({
       content: patch,
