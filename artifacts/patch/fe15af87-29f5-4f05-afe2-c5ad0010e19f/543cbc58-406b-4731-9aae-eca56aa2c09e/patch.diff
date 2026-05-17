@@ -1,0 +1,7 @@
+diff --git a/hello.ts b/hello.ts
+new file mode 100644
+index 0000000..184dfcc
+--- /dev/null
++++ b/hello.ts
+@@ -0,0 +1 @@
++console.log("Hello, World!");

@@ -2,9 +2,6 @@ import { createWorker, type TaskContext, type TaskResult } from "@ai-sdlc/worker
 import { CliRuntime } from "@ai-sdlc/runtime";
 import { FileSystemArtifactStore } from "@ai-sdlc/artifact";
 import { resolveCliCommand } from "./cli-resolver.js";
-import { writeFile, mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
 
 const implementation = (process.argv.find(a => a.startsWith("--implementation="))?.split("=")[1] ?? "kiro") as any;
 const mock = process.argv.includes("--mock");
@@ -48,6 +45,8 @@ async function handleMock(ctx: TaskContext, requirement: string): Promise<TaskRe
 
 async function handleReview(ctx: TaskContext, requirement: string): Promise<TaskResult> {
   const { taskRun, evidence, abortSignal, logger } = ctx;
+  const params = taskRun.params as Record<string, unknown> | null;
+  const workDir = (params?.workDir as string) ?? process.cwd();
 
   // Load patch from previous code step
   const patchRefs = await artifactStore.list({ workflowRunId: taskRun.workflowRunId, artifactType: "patch" });
@@ -59,13 +58,8 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
 
   evidence.append("context_loaded", { requirement, patchLoaded: patchRefs.length > 0, patchSize: patchContent.length });
 
-  // Write patch to temp file — CLI reads from file, not inline
-  const tmpDir = await mkdtemp(join(tmpdir(), "review-"));
-  const patchFile = join(tmpDir, "patch.diff");
-  await writeFile(patchFile, patchContent);
-
   const prompt = patchContent
-    ? `Review the code change in ${patchFile} for the requirement: "${requirement}"`
+    ? `Review this code change for the requirement: "${requirement}"\n\n\`\`\`diff\n${patchContent}\n\`\`\``
     : `Review code changes for: ${requirement}`;
 
   // Resolve CLI
@@ -74,7 +68,13 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
 
   const cmd = [...cli.command, prompt];
 
-  const session = await runtime.createSession({ runtimeType: "cli", workDir: process.cwd(), timeout: taskRun.timeoutMs, abortSignal });
+  const session = await runtime.createSession({
+    runtimeType: "cli",
+    workDir,
+    timeout: taskRun.timeoutMs,
+    abortSignal,
+    env: { NO_COLOR: "1" },
+  });
   try {
     const result = await session.execute({ command: cmd });
     evidence.append("tool_called", { toolName: cli.name, status: result.status, durationMs: result.durationMs });
@@ -94,7 +94,6 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
     return { status: "completed", artifactRefs: [ref], finalConclusion: conclusion };
   } finally {
     await session.destroy();
-    await rm(tmpDir, { recursive: true, force: true });
   }
 }
 

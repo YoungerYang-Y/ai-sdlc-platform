@@ -1,6 +1,6 @@
 ---
 id: design-phase2-real-worker
-status: draft
+status: verified
 owner: "evan"
 tags: [phase2, delivery, experiment, worker, runtime]
 created: 2026-05-17

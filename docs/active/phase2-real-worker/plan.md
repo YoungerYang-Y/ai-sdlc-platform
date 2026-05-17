@@ -1,6 +1,6 @@
 ---
 id: plan-phase2-real-worker
-status: not-started
+status: completed
 owner: "evan"
 tags: [phase2, delivery, experiment, worker]
 created: 2026-05-17

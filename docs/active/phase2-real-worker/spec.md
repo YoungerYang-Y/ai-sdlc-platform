@@ -1,6 +1,6 @@
 ---
 id: spec-phase2-real-worker
-status: draft
+status: shipped
 owner: "evan"
 tags: [phase2, delivery, experiment, worker, kiro-cli]
 created: 2026-05-17

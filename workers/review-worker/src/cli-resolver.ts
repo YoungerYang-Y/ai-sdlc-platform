@@ -6,7 +6,7 @@ export interface CliResolution {
 }
 
 const CLI_CONFIGS: Record<string, { check: string; command: string[] }> = {
-  kiro: { check: "kiro", command: ["kiro", "chat", "--no-interactive", "--trust-all-tools"] },
+  kiro: { check: "kiro-cli", command: ["kiro-cli", "chat", "--no-interactive", "--trust-all-tools"] },
   codex: { check: "codex", command: ["codex", "--quiet", "--task"] },
 };
 

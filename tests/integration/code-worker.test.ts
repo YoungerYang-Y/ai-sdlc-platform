@@ -127,4 +127,50 @@ describe("Code Worker Integration", () => {
     await workspace.release("wf-integ-4");
     expect(existsSync(ws.path)).toBe(false);
   });
+
+  it("error: CLI failure returns failed result", async () => {
+    // Create a CLI that exits with error
+    writeFileSync(join(mockBinDir, "kiro"), "#!/bin/sh\necho 'error' >&2\nexit 1");
+    chmodSync(join(mockBinDir, "kiro"), 0o755);
+
+    const ws = await workspace.acquire({ workflowRunId: "wf-integ-err1", workDir: testRepo });
+    const runtime = new CliRuntime();
+    const session = await runtime.createSession({ runtimeType: "cli", workDir: ws.path, timeout: 5000 });
+    const result = await session.execute({ command: [join(mockBinDir, "kiro"), "do something"] });
+    await session.destroy();
+
+    expect(result.status).toBe("failed");
+    expect(result.exitCode).toBe(1);
+  });
+
+  it("error: git diff empty when CLI produces no changes", async () => {
+    // CLI that does nothing to the repo
+    writeFileSync(join(mockBinDir, "kiro"), "#!/bin/sh\necho 'done'\nexit 0");
+    chmodSync(join(mockBinDir, "kiro"), 0o755);
+
+    const ws = await workspace.acquire({ workflowRunId: "wf-integ-err2", workDir: testRepo });
+    const runtime = new CliRuntime();
+    const session = await runtime.createSession({ runtimeType: "cli", workDir: ws.path, timeout: 5000 });
+    await session.execute({ command: [join(mockBinDir, "kiro"), "no-op"] });
+    await session.destroy();
+
+    // git diff should be empty
+    const diff = execSync("git diff HEAD", { cwd: ws.path, encoding: "utf-8" });
+    const untracked = execSync("git ls-files --others --exclude-standard", { cwd: ws.path, encoding: "utf-8" });
+    expect(diff.trim()).toBe("");
+    expect(untracked.trim()).toBe("");
+  });
+
+  it("error: verify command failure", async () => {
+    await workspace.acquire({ workflowRunId: "wf-integ-err3", workDir: testRepo });
+
+    const runtime = new CliRuntime();
+    const session = await runtime.createSession({ runtimeType: "cli", workDir: testRepo, timeout: 5000 });
+    const result = await session.execute({ command: ["sh", "-c", "echo 'FAIL: test broken' && exit 1"] });
+    await session.destroy();
+
+    expect(result.status).toBe("failed");
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain("FAIL: test broken");
+  });
 });

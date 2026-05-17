@@ -3,12 +3,11 @@ import { isInPath } from "./utils.js";
 export interface CliResolution {
   name: string;
   command: string[];
-  requirementArgStyle: "append" | "flag";
 }
 
-const CLI_CONFIGS: Record<string, { check: string; command: string[]; requirementArgStyle: "append" | "flag" }> = {
-  kiro: { check: "kiro", command: ["kiro", "chat", "--no-interactive", "--trust-all-tools"], requirementArgStyle: "append" },
-  codex: { check: "codex", command: ["codex", "--quiet", "--task"], requirementArgStyle: "append" },
+const CLI_CONFIGS: Record<string, { check: string; command: string[] }> = {
+  kiro: { check: "kiro-cli", command: ["kiro-cli", "chat", "--no-interactive", "--trust-all-tools"] },
+  codex: { check: "codex", command: ["codex", "--quiet", "--task"] },
 };
 
 let cached: CliResolution | null = null;
@@ -21,7 +20,7 @@ export async function resolveCliCommand(preferred: string = "kiro"): Promise<Cli
   for (const name of order) {
     const config = CLI_CONFIGS[name]!;
     if (await isInPath(config.check)) {
-      cached = { name, command: config.command, requirementArgStyle: config.requirementArgStyle };
+      cached = { name, command: config.command };
       return cached;
     }
   }

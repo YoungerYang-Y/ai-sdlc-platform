@@ -81,6 +81,7 @@ async function handleCode(ctx: TaskContext, requirement: string, repository?: st
     workDir: ws.path,
     timeout: taskRun.timeoutMs,
     abortSignal,
+    env: { NO_COLOR: "1" },
   });
 
   try {
