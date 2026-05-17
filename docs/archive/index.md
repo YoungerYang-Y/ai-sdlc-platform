@@ -4,7 +4,9 @@
 
 ## 已归档版本
 
-> 暂无已归档版本。
+| 版本 | 日期 | 包含需求 | 发布说明 |
+|------|------|----------|----------|
+| v0.1.0 | 2026-05-17 | phase1-minimal-loop, phase2-real-worker, phase2-dashboard, phase2-scorecard-compare | [release.md](v0.1.0/release.md) |
 
 ---
 

@@ -6,10 +6,13 @@
 
 | Slug | 标题 | 状态 | 创建日期 | 负责人 |
 |------|------|------|----------|--------|
-| `phase1-minimal-loop` | Phase 1 最小双轨闭环 | ✅ shipped | 2026-05-16 | evan |
-| `phase2-real-worker` | Phase 2 真实 Code Worker 集成 | ✅ shipped | 2026-05-17 | evan |
-| `phase2-dashboard` | Phase 2 基础 Dashboard | ✅ shipped | 2026-05-17 | evan |
-| `phase2-scorecard-compare` | Scorecard 比较 | ✅ shipped | 2026-05-17 | evan |
+| — | 暂无活跃需求 | — | — | — |
+
+---
+
+## 已归档版本
+
+- [v0.1.0](../archive/v0.1.0/release.md) — Phase 1-2 完成（2026-05-17）
 
 ---
 
