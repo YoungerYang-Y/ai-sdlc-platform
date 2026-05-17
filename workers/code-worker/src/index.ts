@@ -172,8 +172,8 @@ async function handleVerify(ctx: TaskContext, verifyCommand?: string): Promise<T
 const DIFF_EXCLUDE = ["node_modules", "dist", "build", ".next", "__pycache__", ".venv", "vendor", "target"];
 
 async function gitDiff(cwd: string): Promise<string> {
-  const excludeArgs = DIFF_EXCLUDE.flatMap(p => ["--", `:!${p}`]);
-  const tracked = await execOutput("git", ["diff", "HEAD", ...excludeArgs], cwd);
+  const excludeArgs = DIFF_EXCLUDE.map(p => `:(exclude)${p}`);
+  const tracked = await execOutput("git", ["diff", "HEAD", "--", ".", ...excludeArgs], cwd);
   const untracked = await execOutput("git", ["ls-files", "--others", "--exclude-standard"], cwd);
 
   // Filter untracked files that aren't in excluded dirs
@@ -182,7 +182,7 @@ async function gitDiff(cwd: string): Promise<string> {
   let patch = tracked;
   if (relevantUntracked.length > 0) {
     await execVoid("git", ["add", "-N", ...relevantUntracked], cwd);
-    patch = await execOutput("git", ["diff", "HEAD", ...excludeArgs], cwd);
+    patch = await execOutput("git", ["diff", "HEAD", "--", ".", ...excludeArgs], cwd);
     await execVoid("git", ["reset", "HEAD", "--", ...relevantUntracked], cwd);
   }
   return patch;
