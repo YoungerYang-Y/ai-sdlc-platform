@@ -169,9 +169,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
   app.get("/artifacts/:type/:workflowId", async (c) => {
     const type = c.req.param("type");
     const workflowId = c.req.param("workflowId");
-    console.log("[artifacts]", { type, workflowId });
     if (!type || !workflowId || workflowId.includes("..")) {
-      return c.json({ error: "invalid artifact ref" }, 400);
+      return c.json({ error: "invalid artifact ref", debug: { type, workflowId } }, 400);
     }
     const { resolve, join } = await import("node:path");
     const { readFile, readdir } = await import("node:fs/promises");

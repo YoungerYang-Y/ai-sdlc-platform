@@ -62,5 +62,13 @@ evaluation.start();
 
 console.log("AI SDLC Platform running");
 
-process.on("SIGTERM", async () => { await evaluation.stop(); await observability.stop(); await orchestrator.stop(); });
-process.on("SIGINT", async () => { await evaluation.stop(); await observability.stop(); await orchestrator.stop(); });
+const shutdown = async () => {
+  console.log("\nShutting down...");
+  setTimeout(() => process.exit(0), 3000); // force exit after 3s
+  try { await evaluation.stop(); } catch {}
+  try { await observability.stop(); } catch {}
+  try { await orchestrator.stop(); } catch {}
+  process.exit(0);
+};
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
