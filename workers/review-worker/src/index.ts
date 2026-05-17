@@ -3,6 +3,11 @@ import { CliRuntime } from "@ai-sdlc/runtime";
 import { FileSystemArtifactStore } from "@ai-sdlc/artifact";
 import { resolveCliCommand } from "./cli-resolver.js";
 
+// Strip ANSI escape codes from CLI output
+function stripAnsi(str: string): string {
+  return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+}
+
 const implementation = (process.argv.find(a => a.startsWith("--implementation="))?.split("=")[1] ?? "kiro") as any;
 const mock = process.argv.includes("--mock");
 
@@ -83,7 +88,7 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
       return { status: "failed", failureType: "business_error", failureReason: result.stderr || `exit ${result.exitCode}` };
     }
 
-    const report = result.stdout || "Review completed - no output from CLI";
+    const report = stripAnsi(result.stdout || "Review completed - no output from CLI");
     const ref = await artifactStore.write({
       content: report,
       metadata: { artifactType: "review_report", workflowRunId: taskRun.workflowRunId, taskRunId: taskRun.id, filename: "review.md", mimeType: "text/markdown", sizeBytes: Buffer.byteLength(report) },
