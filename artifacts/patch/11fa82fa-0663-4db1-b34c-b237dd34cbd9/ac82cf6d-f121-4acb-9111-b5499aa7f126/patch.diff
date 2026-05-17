@@ -1,0 +1,22 @@
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..13afc66
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,9 @@
++# test-repo
++
++一个简单的 TypeScript 项目。
++
++## 快速开始
++
++```bash
++npx ts-node hello.ts
++```
+diff --git a/hello.ts b/hello.ts
+new file mode 100644
+index 0000000..184dfcc
+--- /dev/null
++++ b/hello.ts
+@@ -0,0 +1 @@
++console.log("Hello, World!");

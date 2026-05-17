@@ -81,7 +81,7 @@ async function handleCode(ctx: TaskContext, requirement: string, repository?: st
     workDir: ws.path,
     timeout: taskRun.timeoutMs,
     abortSignal,
-    env: { NO_COLOR: "1" },
+    env: { NO_COLOR: "1", KIRO_LOG_NO_COLOR: "1", FORCE_COLOR: "0" },
   });
 
   try {

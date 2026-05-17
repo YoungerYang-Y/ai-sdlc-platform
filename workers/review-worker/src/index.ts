@@ -73,7 +73,7 @@ async function handleReview(ctx: TaskContext, requirement: string): Promise<Task
     workDir,
     timeout: taskRun.timeoutMs,
     abortSignal,
-    env: { NO_COLOR: "1" },
+    env: { NO_COLOR: "1", KIRO_LOG_NO_COLOR: "1", FORCE_COLOR: "0" },
   });
   try {
     const result = await session.execute({ command: cmd });
