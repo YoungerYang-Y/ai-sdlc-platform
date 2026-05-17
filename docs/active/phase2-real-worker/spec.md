@@ -2,7 +2,7 @@
 id: spec-phase2-real-worker
 status: draft
 owner: "evan"
-tags: [phase2, delivery, worker, runtime, kiro-cli]
+tags: [phase2, delivery, experiment, worker, kiro-cli]
 created: 2026-05-17
 updated: 2026-05-17
 ---
@@ -11,135 +11,138 @@ updated: 2026-05-17
 
 ## 问题与动机
 
-Phase 1 的 Worker 仅支持 mock 模式，real 模式虽然能调用 CLI 但缺少完整的工作目录管理、patch 提取和验证执行能力。平台无法真正完成一个从需求到代码修改的交付闭环。
+Phase 1 的 Worker 仅支持 mock 模式，平台无法真正完成从需求到代码修改的交付闭环。用户提交一个需求后，期望看到真实的代码修改、通过验证、并得到 AI 审查报告——当前做不到。
 
-本需求让 Code Worker 和 Review Worker 能在真实仓库上运行 Kiro CLI / Codex CLI，生成代码修改、通过验证命令、并完成审查。
+同时，实验侧需要能在真实执行中产生有意义的观测数据（执行时长、成功率、产物质量），才能在不同配置之间做有效比较。Mock 模式产出的评分无法反映真实性能。
 
-## 核心决策记录
+## 功能边界
 
-| 决策 | 选择 | 理由 |
-|------|------|------|
-| CLI 工具 | Kiro CLI 主力，Codex 备选 | Kiro 是主要执行引擎 |
-| 工作目录模式 | 本地 + 托管两者都支持 | 本地开发用本地，CI/生产用 clone |
-| 产物提取 | git diff + 保留工作目录 | patch 存 artifact，verify 直接用工作目录 |
-| Verify 方式 | 可配置验收命令 | 确定性强，成本低，灵活 |
-| Skill 注入 | 暂不实现 | 先跑通核心链路，后续独立优化 |
-| Token 采集 | 暂不采集（0 占位） | 等 CLI 提供结构化输出再接入 |
-| 工作目录生命周期 | workflow_run 级别 | code + verify 共享，结束后清理 |
+### In Scope
 
-## 场景
+- Code Worker 在真实仓库上调用 Kiro CLI 生成代码修改
+- 从修改后的仓库中提取 git diff 作为 patch 产物
+- Verify 步骤在修改后的工作目录执行用户指定的验收命令
+- Review Worker 加载前序 patch 并调用 Kiro CLI 进行审查
+- 支持两种仓库模式：本地目录 / 远程 clone
+- CLI fallback：Kiro 不可用时降级到 Codex
+- 工作目录在 workflow 生命周期内共享，结束后清理
+- 真实执行下 observability 链路继续工作（evidence + summary + scorecard）
 
-### 场景 1：托管模式（CI/生产）
+### Out of Scope
 
-1. 用户提交 `POST /workflows { repository, branch, requirement, verifyCommand }`
-2. Code Worker claim code task → clone 仓库到临时目录 → 运行 Kiro CLI → git diff 提取 patch → 保存 artifact
-3. Code Worker claim verify task → 在同一工作目录执行 verifyCommand → 保存日志 artifact
-4. Review Worker claim review task → 加载 patch artifact → 调用 Kiro CLI 审查 → 保存报告
+- Skill / Harness Docs 注入（后续独立需求）
+- Token / cost 精确采集（等 CLI 提供结构化输出）
+- 多仓库支持（单 workflow 涉及多个仓库）
+- OpenHands / Sandbox runtime
+- 并发 Worker 执行
+- 仓库认证管理（使用宿主机已有认证）
 
-### 场景 2：本地模式（开发者调试）
+## 用户场景
 
-1. 用户提交 `POST /workflows { workDir: "/path/to/repo", requirement, verifyCommand }`
-2. Code Worker 直接在指定目录运行，不 clone
-3. 后续流程同上
+### 场景 1：托管模式完整交付
+
+1. 用户提交需求，指定远程仓库 URL、分支和验收命令
+2. 系统 clone 仓库，调用 Kiro CLI 执行代码修改
+3. 系统提取 patch 并保存
+4. 系统在修改后的代码上运行验收命令
+5. 验收通过后，系统调用 Kiro CLI 审查 patch
+6. 用户获得最终状态：completed + patch 产物 + 审查报告
+
+### 场景 2：本地模式开发调试
+
+1. 用户指定本地仓库路径和需求
+2. 系统直接在该目录运行 Kiro CLI
+3. 后续验证和审查同场景 1
+4. 本地模式不 clone 不清理目录
+
+### 场景 3：CLI 不可用降级
+
+1. 用户提交需求，系统发现 Kiro CLI 不在 PATH 中
+2. 系统自动 fallback 到 Codex CLI 执行
+3. 后续流程不变
+
+### 场景 4：验收失败触发重试
+
+1. Code 步骤成功生成修改
+2. Verify 步骤运行验收命令，返回非零 exit code
+3. Attempt 标记 failed，Scheduler 触发重试
+4. 重试时工作目录恢复到干净状态，重新执行 code 步骤
+
+### 场景 5：实验对比——不同 CLI 配置
+
+1. 用户用 version_set A（implementation=kiro）跑一个需求
+2. 用户用 version_set B（implementation=codex）跑同一个需求
+3. 两个 attempt 各自产出 evidence、summary 和 scorecard
+4. 用户可比较两者的成功率、执行时长和产物差异
+
+## 输入与输出
+
+### 用户输入
+
+- 需求描述（自然语言）
+- 仓库来源（远程 URL + 分支 或 本地路径，二选一）
+- 验收命令（可选，如 `pnpm test && pnpm typecheck`）
+
+### 用户可见输出
+
+- Workflow 状态（running → completed / failed）
+- Patch 产物（代码修改的 diff）
+- 验证日志（验收命令的 stdout/stderr）
+- 审查报告（AI 生成的 review 结果）
+- Attempt 级观测数据（执行时长、成功/失败、证据事件）
+- Scorecard（基于真实执行的评分）
 
 ## 验收标准
 
+### 交付侧
+
 - [ ] Given 一个 git 仓库 URL + requirement, When 提交 workflow, Then Code Worker clone 仓库并调用 Kiro CLI 生成代码修改
-- [ ] Given Kiro CLI 执行成功, When 执行完毕, Then git diff 被提取并保存为 patch artifact
+- [ ] Given Kiro CLI 执行成功且有文件修改, When 执行完毕, Then git diff 被提取并保存为 patch artifact
+- [ ] Given Kiro CLI 执行成功但无文件修改, When git diff 为空, Then attempt 标记 failed（business_error）
 - [ ] Given code step 完成, When verify task 被 claim, Then 在同一工作目录执行 verifyCommand
 - [ ] Given verifyCommand 返回 exit code 0, When verify 完成, Then task 标记 completed
-- [ ] Given verifyCommand 返回非零 exit code, When verify 失败, Then attempt 标记 failed 并触发重试
+- [ ] Given verifyCommand 返回非零 exit code, When verify 失败, Then attempt 标记 failed 并可触发重试
+- [ ] Given 未指定 verifyCommand, When verify task 执行, Then 直接标记 completed（跳过验证）
 - [ ] Given review task, When Review Worker claim, Then 加载前序 patch 并调用 Kiro CLI 审查
 - [ ] Given 本地 workDir 模式, When 提交 workflow, Then Worker 直接在该目录执行不 clone
-- [ ] Given Kiro CLI 不可用, When fallback 到 Codex, Then 使用 `codex --quiet --task` 执行
-- [ ] Given workflow 结束, When 所有 task 完成或失败, Then 托管模式工作目录被清理
+- [ ] Given Kiro CLI 不在 PATH, When fallback 到 Codex, Then 使用 Codex CLI 执行并正常完成流程
+- [ ] Given workflow 结束（completed 或 failed）, When 托管模式, Then 工作目录被清理
 
-## 技术设计
+### 实验侧
 
-### 新增组件：WorkspaceManager
+- [ ] Given 真实 CLI 执行, When attempt 完成, Then evidence 事件包含真实的 tool_called（含 durationMs）
+- [ ] Given 真实执行完成, When summary 上报, Then durationMs 反映真实执行耗时
+- [ ] Given 真实执行的 observability complete, When evaluation 触发, Then scorecard 基于真实数据生成
+- [ ] Given 同一需求用不同 implementation 执行, When 两个 attempt 都完成, Then 两个 scorecard 可用于比较
 
-```typescript
-interface WorkspaceManager {
-  // 获取或创建 workflow_run 的工作目录
-  acquire(params: { workflowRunId: string; repository?: string; branch?: string; workDir?: string }): Promise<string>;
-  // 重试前重置工作目录
-  reset(workflowRunId: string): Promise<void>;
-  // 清理工作目录
-  release(workflowRunId: string): Promise<void>;
-}
-```
+### Observability 链路
 
-- 托管模式：`git clone --branch <branch> --depth 1 <repo> /tmp/workspaces/<workflowRunId>`
-- 本地模式：直接返回 workDir，不 clone 不清理
-- 重试时：`git checkout . && git clean -fd`
-
-### CLI 调用策略
-
-```typescript
-// Kiro CLI（主力）
-["kiro", "chat", "--no-interactive", "--trust-all-tools", requirement]
-
-// Codex CLI（备选）
-["codex", "--quiet", "--task", requirement]
-```
-
-选择逻辑：优先 Kiro，如果 Kiro 不在 PATH 中则 fallback 到 Codex。
-
-### Patch 提取
-
-```bash
-git diff HEAD  # 未暂存的修改
-git diff --cached  # 已暂存的修改
-# 合并两者为完整 patch
-```
-
-### 工作目录传递
-
-code 和 verify 通过 `task_run.params.workflowRunId` 共享同一 WorkspaceManager 实例。WorkspaceManager 内部维护 `Map<workflowRunId, workspacePath>`。
-
-### workflow params 扩展
-
-```typescript
-interface WorkflowInput {
-  requirement: string;
-  repository?: string;  // git URL，托管模式
-  branch?: string;      // 默认 "main"
-  workDir?: string;     // 本地路径，本地模式
-  verifyCommand?: string;  // 验收命令，如 "pnpm test"
-}
-```
-
-### 文件变更范围
-
-| 文件 | 变更 |
-|------|------|
-| `packages/runtime/src/index.ts` | 新增 WorkspaceManager |
-| `workers/code-worker/src/index.ts` | 重写 handler，分离 code/verify 逻辑 |
-| `workers/review-worker/src/index.ts` | 增强：加载前序 patch |
-| `apps/orchestrator/src/index.ts` | workflow params 传递 verifyCommand |
+- [ ] Given 真实 CLI 执行, When evidence 和 summary 都上报, Then observability 状态进入 complete
+- [ ] Given attempt_finished 通知, When Scheduler 完成/失败, Then Observability 收到通知
+- [ ] Given observability complete, When eval trigger, Then pending_eval_job 被创建并消费
 
 ## 异常与边界情况
 
 | 场景 | 触发条件 | 预期行为 |
 |------|----------|----------|
 | Clone 失败 | 网络不可达 / 认证失败 | attempt 标记 infrastructure_error，触发重试 |
-| Kiro CLI 不在 PATH | 启动时检测 | fallback 到 Codex |
-| Kiro CLI 超时 | 超过 task timeout | session.execute 返回 timeout，attempt 标记 failed |
-| Kiro 未产生任何修改 | git diff 为空 | attempt 标记 business_error "no changes generated" |
-| verifyCommand 未指定 | params 中无 verifyCommand | verify 步骤跳过（直接 completed） |
-| 工作目录被意外删除 | 外部干预 | acquire 时重新 clone |
+| Kiro CLI 超时 | 超过 task timeout | attempt 标记 failed(timeout) |
+| Kiro CLI 崩溃 | 非零退出码 | attempt 标记 business_error |
+| Kiro + Codex 都不可用 | 均不在 PATH | attempt 标记 infrastructure_error |
+| 验收命令不存在 | 命令无法执行 | attempt 标记 infrastructure_error |
+| 工作目录被意外删除 | 外部干预 | 重新 clone 或报错 |
+| 重试场景 | 前次 attempt failed | 工作目录恢复干净状态后重新执行 |
 
 ## 产品约束
 
-- Kiro CLI 和 Codex CLI 由宿主机提供（PATH 中可用）
-- 仓库认证使用宿主机 SSH/credential（Worker 不管认证）
-- 单 Worker 进程串行处理任务（Phase 1 约束继承）
-- 工作目录上限由磁盘空间决定，不做配额管理
+- Kiro CLI 和 Codex CLI 由宿主机提供，平台不负责安装
+- 仓库认证使用宿主机 SSH / credential helper
+- 单 Worker 进程串行处理任务
+- 工作目录生命周期与 workflow_run 绑定
+- observability 链路行为与 Phase 1 一致，真实执行不改变上报协议
 
-## 不包含（后续迭代）
+## 度量
 
-- Skill / Harness Docs 注入
-- Token / cost 精确采集
-- 多仓库支持（单 workflow 涉及多个仓库）
-- OpenHands / Sandbox runtime
-- 并发 Worker 执行
+- 真实 CLI 调用成功率 > 80%（排除需求本身不合理的情况）
+- 全链路（code → verify → review）端到端完成率 > 50%
+- Scorecard 生成率 = 100%（所有完成的 attempt 都有 scorecard）
