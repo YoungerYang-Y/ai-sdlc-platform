@@ -166,39 +166,33 @@ export function createOrchestrator(config: OrchestratorConfig) {
     return c.json(rows);
   });
 
-  app.get("/artifacts/*", async (c) => {
-    const url = new URL(c.req.url);
-    const ref = url.pathname.replace("/artifacts/", "");
-    if (!ref || ref.includes("..") || ref.startsWith("/")) {
+  app.get("/artifacts/:type/:workflowId", async (c) => {
+    const type = c.req.param("type");
+    const workflowId = c.req.param("workflowId");
+    console.log("[artifacts]", { type, workflowId });
+    if (!type || !workflowId || workflowId.includes("..")) {
       return c.json({ error: "invalid artifact ref" }, 400);
     }
     const { resolve, join } = await import("node:path");
     const { readFile, readdir } = await import("node:fs/promises");
     const { existsSync } = await import("node:fs");
     const basePath = resolve(process.env.ARTIFACT_PATH ?? "./artifacts");
-    const targetPath = resolve(join(basePath, ref));
+    const targetPath = resolve(join(basePath, type, workflowId));
     if (!targetPath.startsWith(basePath)) {
       return c.json({ error: "access denied" }, 403);
     }
     try {
-      // If exact file, return it
-      if (existsSync(targetPath) && (await import("node:fs")).statSync(targetPath).isFile()) {
-        const content = await readFile(targetPath, "utf-8");
-        const ext = ref.split(".").pop();
-        const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
-        return c.text(content, 200, { "Content-Type": contentType });
+      if (!existsSync(targetPath)) {
+        return c.json({ error: "artifact not found" }, 404);
       }
-      // If directory prefix, find first file recursively
-      if (existsSync(targetPath)) {
-        const files = await findFiles(targetPath);
-        if (files.length > 0) {
-          const content = await readFile(files[0]!, "utf-8");
-          const ext = files[0]!.split(".").pop();
-          const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
-          return c.text(content, 200, { "Content-Type": contentType });
-        }
+      const files = await findFiles(targetPath);
+      if (files.length === 0) {
+        return c.json({ error: "artifact not found" }, 404);
       }
-      return c.json({ error: "artifact not found" }, 404);
+      const content = await readFile(files[0]!, "utf-8");
+      const ext = files[0]!.split(".").pop();
+      const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
+      return c.text(content, 200, { "Content-Type": contentType });
     } catch {
       return c.json({ error: "artifact not found" }, 404);
     }
