@@ -87,7 +87,7 @@ export class WorkspaceManager {
   async reset(workflowRunId: string): Promise<void> {
     const entry = this.entries.get(workflowRunId);
     if (!entry) return;
-    await this.exec("git", ["checkout", "."], entry.path);
+    await this.exec("git", ["reset", "--hard", entry.baseCommit], entry.path);
     await this.exec("git", ["clean", "-fd"], entry.path);
   }
 

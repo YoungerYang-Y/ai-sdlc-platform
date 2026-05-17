@@ -63,11 +63,9 @@ async function handleMock(ctx: TaskContext, stepId: string, requirement: string)
 async function handleCode(ctx: TaskContext, requirement: string, repository?: string, branch?: string, workDir?: string): Promise<TaskResult> {
   const { taskRun, evidence, abortSignal, logger } = ctx;
 
-  // Acquire workspace (reset if retrying)
-  if (taskRun.currentAttemptCount > 1) {
-    await workspace.reset(taskRun.workflowRunId);
-  }
+  // Acquire workspace (always reset for code step to ensure clean state)
   const ws = await workspace.acquire({ workflowRunId: taskRun.workflowRunId, repository, branch, workDir });
+  await workspace.reset(taskRun.workflowRunId);
 
   evidence.append("context_loaded", { requirement, repository, branch, commit: ws.baseCommit });
 
