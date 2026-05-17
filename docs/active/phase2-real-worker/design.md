@@ -70,12 +70,14 @@ interface WorkspaceManager {
 **CLI 选择器**（新增，`workers/code-worker/src/cli-resolver.ts`）：
 
 ```typescript
-// 返回可用 CLI 的命令数组
+// 返回可用 CLI 的命令数组（启动时一次性检测，结果缓存）
 function resolveCliCommand(preferred: string): Promise<string[]>;
 // preferred="kiro" → which kiro → 有则返回 ["kiro","chat","--no-interactive","--trust-all-tools"]
 // 无则检测 codex → ["codex","--quiet","--task"]
 // 两者都无 → throw Error("NO_CLI_AVAILABLE")
 ```
+
+检测时机：Worker 进程启动时调用一次，结果缓存在模块级变量中。不在每次 claim 时重复检测（避免 PATH 中途变化导致行为不一致）。
 
 **Code Worker Handler 签名不变**（`(ctx: TaskContext) => Promise<TaskResult>`），内部逻辑重写。
 
@@ -83,7 +85,7 @@ function resolveCliCommand(preferred: string): Promise<string[]>;
 
 用户输入（repository URL、verifyCommand）直接用于 shell 命令，必须防护：
 
-1. **repository URL**：WorkspaceManager 使用数组形式传递给 `spawn`（如 `spawn("git", ["clone", "--branch", branch, "--depth", "1", url, destPath])`），不通过 shell 字符串拼接
+1. **repository URL**：WorkspaceManager 使用数组形式传递给 `spawn`（如 `spawn("git", ["clone", "--branch", branch, "--depth", "1", url, destPath])`），不通过 shell 字符串拼接。额外校验：URL 必须匹配 `^(https?://|git@|ssh://)` 格式，拒绝 `file://`、相对路径和含有 shell 元字符的输入。
 2. **verifyCommand**：通过 `spawn("sh", ["-c", verifyCommand])` 执行——verifyCommand 由 workflow 提交者（平台操作者）控制，非外部用户输入。在 `POST /workflows` 输入校验中做基础 allowlist 检查（禁止 `rm -rf /`、`curl | sh` 等危险模式）
 3. **所有 git 命令**：使用 `spawn` 数组形式，不使用 `exec` 或模板字符串拼接
 
@@ -120,6 +122,7 @@ sequenceDiagram
   O->>S: submitTask(review)
   S-->>RW: claim → review task
   RW->>A: load patch artifact
+  Note over RW: patch 写入临时文件，通过 stdin 或 --instructions-file 传入 CLI
   RW->>CLI: kiro chat --no-interactive "review: <patch>"
   CLI-->>RW: review report
   RW->>A: write(review.md)
@@ -154,6 +157,19 @@ sequenceDiagram
 - **code step retry**：reset 工作目录 → 重新运行 CLI（合理，因为要重新生成代码）
 - **verify step**：始终在 code 产出的工作目录上运行，不做 reset（verify 只读取 code 的产出）
 
+```mermaid
+sequenceDiagram
+  participant S as Scheduler
+  participant CW as Code Worker
+  participant WM as WorkspaceManager
+
+  Note over S,CW: verify attempt 失败（maxAttempts 耗尽）
+  S-->>S: verify task → permanently_failed
+  S->>S: onTaskFailed callback
+  Note over S: Orchestrator 按 onFailure 策略处理
+  Note over S: 当前策略: abort → workflow failed
+```
+
 ## 影响范围
 
 | 模块 | 路径 | 变更类型 | 说明 |
@@ -171,6 +187,7 @@ sequenceDiagram
 - Kiro CLI / Codex CLI 必须在 Worker 宿主机 PATH 中可用
 - 仓库认证使用宿主机 SSH agent 或 credential helper
 - WorkspaceManager 纯内存状态，进程重启后工作目录需重新 acquire（重试机制会处理）
+- 进程重启清理策略：启动时扫描 `WORKSPACE_BASE_PATH` 下的子目录，删除超过 24 小时未修改的目录（孤儿清理）
 - 工作目录基础路径：`/tmp/ai-sdlc-workspaces/`（可通过 `WORKSPACE_BASE_PATH` 环境变量覆盖）
 - 所有 shell 命令使用 `spawn` 数组形式，禁止字符串拼接
 
@@ -238,20 +255,34 @@ sequenceDiagram
 
 ## 备选方案
 
-### 方案 A（已否决）：WorkspaceManager 放在 packages/runtime
+### 方案 A（已否决）：使用 isomorphic-git 替代 shell git
+
+- **优势**：纯 JS 实现，无需依赖系统 git；类型安全；避免 spawn 的 shell 注入风险
+- **否决原因**：
+  1. isomorphic-git 不支持完整的 git 功能集（如 `git clean -fd`、sparse checkout）
+  2. SSH 认证集成复杂，需要额外的 SSH agent 桥接
+  3. 引入 ~2MB 依赖，且 LLM 训练数据中覆盖不如系统 git + spawn
+  4. 系统 git 通过 spawn 数组形式调用已足够安全
+
+### 方案 B（已否决）：不做，保持 mock-only
+
+- **优势**：零开发成本；现有测试和 observability 链路不受影响
+- **否决原因**：平台的核心价值是"自动化从需求到交付"，mock 模式无法真正交付业务价值。Phase 1 已证明链路可行，Phase 2 必须让真实 CLI 跑起来才能验证平台可用性。
+
+### 方案 C（已否决）：WorkspaceManager 放在 packages/runtime
 
 - **优势**：集中管理所有"执行环境准备"能力
-- **否决原因**：Runtime 模块职责是"进程执行抽象"（spawn/timeout/cancel），不应耦合 git 仓库管理。WorkspaceManager 是 Worker 特有的执行策略，不同 Worker 可能需要不同的工作目录策略。放 Runtime 会让该模块变成"万能工具包"，违反单一职责。
+- **否决原因**：Runtime 模块职责是"进程执行抽象"（spawn/timeout/cancel），不应耦合 git 仓库管理。WorkspaceManager 是 Worker 特有的执行策略，放 Runtime 会让该模块变成"万能工具包"，违反单一职责。
 
-### 方案 B（已否决）：不保留工作目录，verify 时 apply patch
+### 方案 D（已否决）：不保留工作目录，verify 时 apply patch
 
 - **优势**：每个 step 完全无状态，便于分布式调度
 - **否决原因**：
-  1. apply patch 后文件状态可能与 code step 产出不一致（patch 基于 clean state，但 CLI 可能修改了未 tracked 的文件如 lock files）
-  2. 增加不必要的复杂度——Phase 2 是单 Worker 串行模型，无需为分布式做提前设计
-  3. verify 需要完整的 node_modules、编译产物等中间状态，仅 patch 不够
+  1. apply patch 后文件状态可能与 code step 产出不一致（CLI 可能修改 lock files 等未 tracked 文件）
+  2. verify 需要完整的 node_modules、编译产物等中间状态，仅 patch 不够
+  3. Phase 2 是单 Worker 串行模型，无需为分布式做提前设计
 
-### 方案 C（已否决）：不做 CLI fallback，只支持 Kiro
+### 方案 E（已否决）：不做 CLI fallback
 
-- **优势**：实现更简单，不需要检测逻辑
-- **否决原因**：开发环境可能没有 Kiro CLI（如 CI 只安装了 Codex），fallback 成本极低（十几行代码），但显著提升可用性
+- **优势**：实现更简单
+- **否决原因**：开发环境可能没有 Kiro CLI（CI 只装了 Codex），fallback 成本极低但显著提升可用性

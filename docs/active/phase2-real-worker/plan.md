@@ -34,6 +34,8 @@ updated: 2026-05-17
 - `reset()`：`git checkout . && git clean -fd`（恢复到 baseCommit 状态）
 - `release()`：cloned 模式删除目录；local 模式不操作
 - 重入幂等：acquire 同一 workflowRunId 返回已有目录（verify 步骤复用）
+- 启动时孤儿清理：扫描 basePath，删除 mtime > 24h 的子目录
+- repository URL 校验：必须匹配 `^(https?://|git@|ssh://)` 格式
 - 所有 git/shell 命令用 spawn 数组形式
 
 ### T2: 实现 CLI Resolver
@@ -49,6 +51,7 @@ updated: 2026-05-17
 - fallback：kiro 不可用 → 检测 `codex` → 返回 `["codex", "--quiet", "--task"]`
 - 两者都不可用 → throw `Error("NO_CLI_AVAILABLE")`
 - 检测方式：`spawn("which", [cmd])` 检查 exit code
+- 检测时机：Worker 启动时一次性调用并缓存结果，不在每次 claim 时重复检测
 
 ### T3: 重写 Code Worker handler
 - depends_on: [T1, T2]
@@ -75,15 +78,15 @@ updated: 2026-05-17
 - verify: `cd workers/review-worker && pnpm test && pnpm typecheck`
 - agent: main
 - status: todo
-- deliverable: `workers/review-worker/src/index.ts` 修改
+- deliverable: `workers/review-worker/src/index.ts` 修改 + 单元测试
 
 变更：
-- 从 Artifact Store 加载同 workflow_run 的 patch artifact
-- 将 patch 内容作为 context 传给 Kiro CLI：`kiro chat --no-interactive "Review this code change:\n<patch>"`
+- 从 Artifact Store 加载同 workflow_run 的 patch artifact（按 artifactType="patch" 查询）
+- patch 传入方式：将 patch 内容写入临时文件，通过 prompt 中引用文件路径传给 Kiro CLI
 - 保留 `--mock` 开关
 
 ### T5: Orchestrator 传递 workflow input 到 task params
-- depends_on: [T3]
+- depends_on: []
 - scope: `apps/orchestrator/src/index.ts`
 - verify: `cd apps/orchestrator && pnpm typecheck`
 - agent: main
@@ -96,14 +99,16 @@ updated: 2026-05-17
 
 ### T6: 集成测试
 - depends_on: [T3, T4, T5]
-- scope: `tests/e2e-real.test.ts`, `workers/code-worker/tests/`
+- scope: `tests/e2e-real.test.ts`, `workers/code-worker/tests/`, `tests/fixtures/mock-cli.sh`
 - verify: `pnpm test`
 - agent: main
 - status: todo
 - deliverable: 集成测试通过
 
 内容：
-- Code Worker 集成测试：用真实 git 仓库（`git init` 临时仓库）+ mock CLI（echo 一个固定修改脚本）验证全链路
+- Mock CLI 脚本：`tests/fixtures/mock-cli.sh` — 接收 requirement 参数，向仓库写入固定文件修改（如 `echo "hello" > output.txt`），exit 0。通过 PATH 优先级或 CLI Resolver 注入使 Worker 使用该脚本
+- Code Worker 集成测试：用真实 git 仓库（`git init` 临时仓库）+ mock-cli.sh 验证全链路
+- 工作目录清理断言：verify workflow 结束后，WorkspaceManager.release() 被调用，临时目录已删除
 - 验证 observability 链路：evidence + summary + scorecard 在非 mock handler 下正常生成
 - 可选 E2E（`RUN_REAL_E2E=true`）：调用真实 Kiro CLI
 

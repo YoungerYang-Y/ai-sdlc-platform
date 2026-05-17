@@ -19,12 +19,12 @@ Phase 1 的 Worker 仅支持 mock 模式，平台无法真正完成从需求到�
 
 ### In Scope
 
-- Code Worker 在真实仓库上调用 Kiro CLI 生成代码修改
-- 从修改后的仓库中提取 git diff 作为 patch 产物
+- Code Worker 在真实仓库上调用 AI CLI 生成代码修改
+- 从修改后的仓库中提取代码变更作为 patch 产物
 - Verify 步骤在修改后的工作目录执行用户指定的验收命令
-- Review Worker 加载前序 patch 并调用 Kiro CLI 进行审查
+- Review Worker 加载前序 patch 产物并调用 AI CLI 进行审查
 - 支持两种仓库模式：本地目录 / 远程 clone
-- CLI fallback：Kiro 不可用时降级到 Codex
+- CLI 降级：主力 CLI 不可用时自动降级到备选 CLI
 - 工作目录在 workflow 生命周期内共享，结束后清理
 - 真实执行下 observability 链路继续工作（evidence + summary + scorecard）
 
@@ -36,39 +36,52 @@ Phase 1 的 Worker 仅支持 mock 模式，平台无法真正完成从需求到�
 - OpenHands / Sandbox runtime
 - 并发 Worker 执行
 - 仓库认证管理（使用宿主机已有认证）
+- Phase 2 实验侧批量能力（benchmark batch、experiment 管理）→ 独立 spec
 
 ## 用户场景
 
 ### 场景 1：托管模式完整交付
 
 1. 用户提交需求，指定远程仓库 URL、分支和验收命令
-2. 系统 clone 仓库，调用 Kiro CLI 执行代码修改
+2. 系统 clone 仓库，调用 AI CLI 执行代码修改
 3. 系统提取 patch 并保存
 4. 系统在修改后的代码上运行验收命令
-5. 验收通过后，系统调用 Kiro CLI 审查 patch
+5. 验收通过后，系统调用 AI CLI 审查 patch
 6. 用户获得最终状态：completed + patch 产物 + 审查报告
 
 ### 场景 2：本地模式开发调试
 
 1. 用户指定本地仓库路径和需求
-2. 系统直接在该目录运行 Kiro CLI
+2. 系统直接在该目录运行 AI CLI
 3. 后续验证和审查同场景 1
 4. 本地模式不 clone 不清理目录
 
 ### 场景 3：CLI 不可用降级
 
-1. 用户提交需求，系统发现 Kiro CLI 不在 PATH 中
-2. 系统自动 fallback 到 Codex CLI 执行
-3. 后续流程不变
+1. 用户提交需求，系统发现主力 CLI 不在 PATH 中
+2. 系统自动降级到备选 CLI 执行
+3. 后续流程不变，用户可从 evidence 事件中看到实际使用的 CLI
 
-### 场景 4：验收失败触发重试
+### 场景 4：Code 步骤失败重试
+
+1. AI CLI 执行失败（超时或异常退出）
+2. Attempt 标记 failed，Scheduler 按 maxAttempts 触发重试
+3. 重试时工作目录恢复到干净状态，全新执行 AI CLI
+
+### 场景 5：验收失败
 
 1. Code 步骤成功生成修改
 2. Verify 步骤运行验收命令，返回非零 exit code
-3. Attempt 标记 failed，Scheduler 触发重试
-4. 重试时工作目录恢复到干净状态，重新执行 code 步骤
+3. Verify attempt 标记 failed
+4. 当前行为：workflow 标记 failed（后续可扩展为回退到 code 步骤重试）
 
-### 场景 5：实验对比——不同 CLI 配置
+### 场景 6：验收命令未指定
+
+1. 用户提交需求时未提供验收命令
+2. Verify 步骤直接标记 completed，跳过实际验证
+3. 流程继续进入 review 步骤
+
+### 场景 7：实验对比——不同 CLI 配置
 
 1. 用户用 version_set A（implementation=kiro）跑一个需求
 2. 用户用 version_set B（implementation=codex）跑同一个需求
@@ -88,54 +101,55 @@ Phase 1 的 Worker 仅支持 mock 模式，平台无法真正完成从需求到�
 - Workflow 状态（running → completed / failed）
 - Patch 产物（代码修改的 diff）
 - 验证日志（验收命令的 stdout/stderr）
-- 审查报告（AI 生成的 review 结果）
-- Attempt 级观测数据（执行时长、成功/失败、证据事件）
+- 审查报告（AI 生成的 review 文本）
+- Attempt 级观测数据（执行时长、成功/失败、证据事件、使用的 CLI 名称）
 - Scorecard（基于真实执行的评分）
 
 ## 验收标准
 
 ### 交付侧
 
-- [ ] Given 一个 git 仓库 URL + requirement, When 提交 workflow, Then Code Worker clone 仓库并调用 Kiro CLI 生成代码修改
-- [ ] Given Kiro CLI 执行成功且有文件修改, When 执行完毕, Then git diff 被提取并保存为 patch artifact
-- [ ] Given Kiro CLI 执行成功但无文件修改, When git diff 为空, Then attempt 标记 failed（business_error）
-- [ ] Given code step 完成, When verify task 被 claim, Then 在同一工作目录执行 verifyCommand
+- [ ] Given 一个 git 仓库 URL + requirement, When 提交 workflow, Then 系统 clone 仓库并调用 AI CLI 生成代码修改
+- [ ] Given AI CLI 执行成功且有文件修改, When 执行完毕, Then 代码变更被提取并保存为 patch artifact
+- [ ] Given AI CLI 执行成功但无文件修改, When 变更为空, Then attempt 标记 failed（business_error）
+- [ ] Given code step 完成, When verify task 执行, Then 在同一工作目录（含 code 修改）运行验收命令
 - [ ] Given verifyCommand 返回 exit code 0, When verify 完成, Then task 标记 completed
-- [ ] Given verifyCommand 返回非零 exit code, When verify 失败, Then attempt 标记 failed 并可触发重试
+- [ ] Given verifyCommand 返回非零 exit code, When verify 失败, Then attempt 标记 failed
 - [ ] Given 未指定 verifyCommand, When verify task 执行, Then 直接标记 completed（跳过验证）
-- [ ] Given review task, When Review Worker claim, Then 加载前序 patch 并调用 Kiro CLI 审查
-- [ ] Given 本地 workDir 模式, When 提交 workflow, Then Worker 直接在该目录执行不 clone
-- [ ] Given Kiro CLI 不在 PATH, When fallback 到 Codex, Then 使用 Codex CLI 执行并正常完成流程
+- [ ] Given review task, When Review Worker 执行, Then 加载前序 patch 内容并调用 AI CLI 产出审查报告
+- [ ] Given 本地 workDir 模式, When 提交 workflow, Then 系统直接在该目录执行不 clone
+- [ ] Given 主力 CLI 不在 PATH, When 降级到备选 CLI, Then 使用备选 CLI 执行并正常完成流程
 - [ ] Given workflow 结束（completed 或 failed）, When 托管模式, Then 工作目录被清理
 
 ### 实验侧
 
-- [ ] Given 真实 CLI 执行, When attempt 完成, Then evidence 事件包含真实的 tool_called（含 durationMs）
+- [ ] Given 真实 CLI 执行, When attempt 完成, Then evidence 事件包含真实的 tool_called（含 CLI 名称和 durationMs）
 - [ ] Given 真实执行完成, When summary 上报, Then durationMs 反映真实执行耗时
 - [ ] Given 真实执行的 observability complete, When evaluation 触发, Then scorecard 基于真实数据生成
 - [ ] Given 同一需求用不同 implementation 执行, When 两个 attempt 都完成, Then 两个 scorecard 可用于比较
 
 ### Observability 链路
 
-- [ ] Given 真实 CLI 执行, When evidence 和 summary 都上报, Then observability 状态进入 complete
+- [ ] Given 真实 CLI 执行完毕, When evidence 和 summary 都上报, Then observability 状态进入 complete 并生成 scorecard
 - [ ] Given attempt_finished 通知, When Scheduler 完成/失败, Then Observability 收到通知
-- [ ] Given observability complete, When eval trigger, Then pending_eval_job 被创建并消费
+- [ ] Given observability complete, When eval trigger, Then pending_eval_job 被创建、消费并生成 attempt_scorecard
 
 ## 异常与边界情况
 
 | 场景 | 触发条件 | 预期行为 |
 |------|----------|----------|
 | Clone 失败 | 网络不可达 / 认证失败 | attempt 标记 infrastructure_error，触发重试 |
-| Kiro CLI 超时 | 超过 task timeout | attempt 标记 failed(timeout) |
-| Kiro CLI 崩溃 | 非零退出码 | attempt 标记 business_error |
-| Kiro + Codex 都不可用 | 均不在 PATH | attempt 标记 infrastructure_error |
+| AI CLI 超时 | 超过 task timeout | attempt 标记 failed |
+| AI CLI 崩溃 | 非零退出码 | attempt 标记 failed |
+| 所有 CLI 都不可用 | 均不在 PATH | attempt 标记 infrastructure_error，不重试 |
 | 验收命令不存在 | 命令无法执行 | attempt 标记 infrastructure_error |
 | 工作目录被意外删除 | 外部干预 | 重新 clone 或报错 |
-| 重试场景 | 前次 attempt failed | 工作目录恢复干净状态后重新执行 |
+| Code step 重试 | 前次 attempt failed | 工作目录恢复干净状态后全新执行 |
+| Verify step 失败 | 验收命令返回非零 | 保留代码修改（不恢复），workflow 按策略处理 |
 
 ## 产品约束
 
-- Kiro CLI 和 Codex CLI 由宿主机提供，平台不负责安装
+- AI CLI 由宿主机提供，平台不负责安装
 - 仓库认证使用宿主机 SSH / credential helper
 - 单 Worker 进程串行处理任务
 - 工作目录生命周期与 workflow_run 绑定
