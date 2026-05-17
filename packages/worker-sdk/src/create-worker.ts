@@ -107,6 +107,7 @@ export function createWorker(config: WorkerConfig, handler: (ctx: TaskContext) =
     // 上报 complete/fail
     if (result.status === "completed") {
       await scheduler.complete({ attemptId: attempt.id, leaseToken, artifactRefs: result.artifactRefs ?? [] });
+      logger.info("attempt completed", { attemptId: attempt.id, taskType: taskRun.taskType, conclusion: result.finalConclusion });
     } else {
       await scheduler.fail({
         attemptId: attempt.id,
@@ -114,6 +115,7 @@ export function createWorker(config: WorkerConfig, handler: (ctx: TaskContext) =
         failureType: (result.failureType ?? "business_error") as import("./types/execution.js").FailureType,
         failureReason: result.failureReason ?? "unknown",
       });
+      logger.info("attempt failed", { attemptId: attempt.id, taskType: taskRun.taskType, reason: result.failureReason });
     }
 
     // flush 残余证据 + 发送 summary

@@ -25,11 +25,12 @@ export interface Span {
 /** 默认 console logger */
 export function createConsoleLogger(workerId: string): Logger {
   const prefix = `[${workerId}]`;
+  const ts = () => new Date().toISOString();
   return {
-    debug: (msg, meta) => console.debug(prefix, msg, meta ?? ""),
-    info: (msg, meta) => console.info(prefix, msg, meta ?? ""),
-    warn: (msg, meta) => console.warn(prefix, msg, meta ?? ""),
-    error: (msg, meta) => console.error(prefix, msg, meta ?? ""),
+    debug: (msg, meta) => console.debug(ts(), prefix, msg, meta ?? ""),
+    info: (msg, meta) => console.info(ts(), prefix, msg, meta ?? ""),
+    warn: (msg, meta) => console.warn(ts(), prefix, msg, meta ?? ""),
+    error: (msg, meta) => console.error(ts(), prefix, msg, meta ?? ""),
   };
 }
 
