@@ -1,12 +1,31 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { createWorkflow } from "../api";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { createWorkflow, fetchWorkflow } from "../api";
 
 export function WorkflowCreate() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ requirement: "", repository: "", workDir: "", branch: "", verifyCommand: "", triggerType: "manual" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Pre-fill from existing workflow
+  useEffect(() => {
+    const fromId = searchParams.get("from");
+    if (fromId) {
+      fetchWorkflow(fromId).then(wf => {
+        const input = wf.input as Record<string, string>;
+        setForm({
+          requirement: input.requirement ?? "",
+          repository: input.repository ?? "",
+          workDir: input.workDir ?? "",
+          branch: input.branch ?? "",
+          verifyCommand: input.verifyCommand ?? "",
+          triggerType: wf.trigger_type ?? "manual",
+        });
+      }).catch(() => {});
+    }
+  }, [searchParams]);
 
   const set = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 

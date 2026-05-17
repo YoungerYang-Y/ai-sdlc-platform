@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { fetchWorkflow, fetchArtifact, type WorkflowDetail as WFDetail } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 import { DiffViewer } from "../components/DiffViewer";
@@ -58,6 +58,7 @@ export function WorkflowDetail() {
         <StatusBadge status={wf.status} />
         <span className="text-gray-400 text-xs">{new Date(wf.created_at).toLocaleString()}</span>
         {wf.finished_at && <span className="text-gray-400 text-xs">→ {new Date(wf.finished_at).toLocaleString()}</span>}
+        <Link to={`/workflows/new?from=${wf.id}`} className="ml-auto text-sm text-blue-600 hover:underline">复制新增</Link>
       </div>
 
       {/* Input */}
