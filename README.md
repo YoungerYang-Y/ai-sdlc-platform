@@ -1,149 +1,95 @@
-# AI SDLC 平台
+# AI SDLC Platform
 
-基于 LangGraph、Voltagent 和 OpenHands 构建的 AI 驱动软件开发生命周期平台。
+AI 驱动的软件开发生命周期平台，通过编排多个专用 Worker 自动化完成从需求到交付的全流程。
 
-## 架构
-
-```
-ai-sdlc-platform/
-├── apps/              # 应用服务
-├── packages/          # 共享库
-├── workers/           # 任务执行器
-├── runtimes/          # 运行时环境
-├── scripts/           # 工具脚本
-└── infra/             # 基础设施配置
-```
-
-## 组件
-
-### Apps（应用）
-- **orchestrator** - 核心工作流编排服务 (TypeScript)
-- **dashboard** - 监控和控制 Web UI (TypeScript)
-
-### Packages（共享包）
-- **workflow** - 工作流定义和执行
-- **scheduler** - 任务调度和队列管理
-- **artifact** - 构建产物管理
-- **runtime** - 运行时环境抽象
-- **worker-sdk** - Worker 开发 SDK
-
-### Workers（执行器）
-- **codex-worker** - 代码生成和分析 (Node/Python)
-- **claude-worker** - Claude AI 集成 (Node)
-- **review-worker** - 代码审查自动化 (Python)
-
-### Runtimes（运行时）
-- **openhands** - OpenHands 运行时集成 (Python)
-- **sandbox** - 隔离执行沙箱 (Python)
+平台同时服务两类场景：
+- **delivery mode**：面向真实业务需求的自动化交付（代码生成 → 验证 → 审查 → PR）
+- **experiment mode**：面向 benchmark 和版本对比的持续调优
 
 ## 技术栈
 
-- **编排**: LangGraph, Voltagent
-- **运行时**: OpenHands
-- **语言**: TypeScript, Python, Node.js
-- **数据库**: PostgreSQL
-- **容器化**: Docker
+- **语言**：TypeScript（全栈）
+- **Web 框架**：Hono
+- **数据库**：PostgreSQL
+- **前端**：React + Tailwind CSS + Vite
+- **运行时**：OpenHands + Sandbox（隔离执行）
+- **包管理**：pnpm workspaces（Monorepo）
+- **测试**：Vitest
+
+## 项目结构
+
+```
+ai-sdlc-platform/
+├── src/server.ts          # 进程入口（组合根）
+├── apps/
+│   ├── orchestrator/      # 工作流编排服务（Hono API）
+│   └── dashboard/         # 监控和控制 Web UI（React）
+├── packages/
+│   ├── worker-sdk/        # 统一协议、类型定义
+│   ├── scheduler/         # 任务调度（claim/lease/retry）
+│   ├── workflow/          # 工作流定义与模板
+│   ├── artifact/          # 产物存储（文件系统）
+│   ├── runtime/           # 运行时抽象接口
+│   ├── observability/     # 证据索引、时间线、聚合
+│   ├── evaluation/        # 评分（规则 + LLM + 人工校准）
+│   └── insights/          # 趋势与对比洞察（待实现）
+├── workers/
+│   ├── code-worker/       # 代码生成 + 验证（支持 codex/kiro implementation）
+│   └── review-worker/     # 代码审查
+├── runtimes/
+│   ├── openhands/         # OpenHands 运行时集成
+│   └── sandbox/           # 隔离执行环境
+├── infra/
+│   ├── postgres/          # 数据库 Schema + 迁移 + 种子
+│   └── docker/            # Docker Compose 配置
+└── artifacts/             # 产物输出目录（patch/log/review_report）
+```
 
 ## 快速开始
 
 ```bash
-# 安装依赖
+# 1. 安装依赖
 pnpm install
 
-# 初始化基础设施
-./scripts/workspace.sh
+# 2. 启动开发环境（PostgreSQL + 迁移 + 种子数据）
+./scripts/dev-setup.sh
 
-# 启动服务
-pnpm dev
+# 3. 启动平台
+npx tsx src/server.ts
+
+# 4. 启动 Dashboard（另一个终端）
+cd apps/dashboard && pnpm dev
 ```
 
-## 开发
-
-这是一个使用 pnpm workspaces 管理的 monorepo。
+## 开发命令
 
 ```bash
-# 运行特定应用
-pnpm --filter orchestrator dev
-
-# 运行特定 worker
-pnpm --filter claude-worker dev
-
-# 清理环境
-./scripts/cleanup.sh
+pnpm build        # 构建所有包
+pnpm test         # 运行所有测试
+pnpm test:e2e     # 端到端测试
+pnpm typecheck    # 类型检查
+pnpm lint         # 代码规范检查
 ```
 
-## 多期能力规划
+## 核心对象模型
 
-平台按“双轨演进”推进：每一阶段同时交付一个更完整的业务闭环和实验闭环，而不是先做完整交付平台、再整体补实验平台。
+- **workflow_run** — 一次完整需求实现，由 orchestrator 编排
+- **task_run** — workflow 中的阶段级任务（code / verify / review）
+- **worker_attempt** — 某个 worker 对某个 task_run 的一次执行
+- **version_set** — 运行绑定的版本快照（method_version + execution_version）
 
-### Phase 1 - Minimal Delivery + Minimal Experiment（当前优先）
+## 当前版本（v0.1.0）
 
-**目标**：同时跑通最小业务链路和最小实验闭环
+已完成 Phase 1-2 核心功能：
 
-**交付侧**：
-- 工作流编排（简单状态机）
-- 任务调度（PostgreSQL + claim/lease/retry）
-- Codex Worker（code + verify）
-- Review Worker
-- Runtime 抽象（OpenHands 集成）
-- Artifact 存储（文件系统）
-
-**实验侧**：
-- `workflow_run / task_run / worker_attempt` 基础对象模型
-- `version_set` 运行身份绑定（method + execution）
-- 固定 benchmark 或 ad-hoc task 发起运行
-- `worker_attempt` 级观测：context、reasoning、tool trace、token/cost、timing、artifact refs
-- 基础 `attempt_scorecard`
-- 同一 benchmark 下两个 `version_set` 的基础 compare
-
-**时间线**：2-4 周
-
-### Phase 2 - Robust Execution + Operator UX
-
-**目标**：把第一期的可用闭环变成可持续操作的系统
-
-**交付侧**：
-- Claude Worker（analysis + plan）
-- 更稳的调度：优先级、并发控制、回收策略增强
-- 基础人工介入流程
-- Dashboard 主操作视图
-
-**实验侧**：
-- Experiment Batch
-- Benchmark 管理
-- Attempt Review / Replay
-- Task / Run 聚合评分
-- 初步 Feedback Labeling
-
-**时间线**：4-6 周
-
-### Phase 3 - Full Evaluation & Optimization Loop
-
-**目标**：把实验能力做成真正的优化平台
-
-**新增能力**：
-- Experiment Service 完整化
-- Observability Service（结构化 evidence index）
-- Evaluation Service（rule + LLM + human 混合评分）
-- Calibration Queue
-- Insights & Compare（趋势、性价比、版本对比）
-- Method Tuning Workflow（回灌 skill / harness docs / worker / model）
-
-**时间线**：6-8 周
-
-### Phase 4 - Productionization
-
-**目标**：支持生产环境和大规模使用
-
-**新增能力**：
-- 多租户、资源配额、权限管理
-- Redis / 分布式队列
-- 高可用（多实例、主从复制、对象存储）
-- 性能优化（并发优化、缓存、池管理）
-- 安全增强（API 认证、RBAC、审计日志）
-- OpenTelemetry、告警与审计
-
-**时间线**：8-10 周
+- ✅ Orchestrator 工作流编排（状态机 + 任务推进）
+- ✅ Scheduler 任务调度（claim/lease/heartbeat/retry）
+- ✅ Code Worker（真实 git 仓库操作、codex/kiro 双 implementation）
+- ✅ Review Worker（代码审查 + 报告生成）
+- ✅ Artifact 产物管理（patch / log / review_report）
+- ✅ Observability 观测（attempt 级证据收集 + scorecard）
+- ✅ Dashboard（工作流列表/创建/详情 + Scorecard 对比视图）
+- ✅ PR 自动交付（best-effort 通过 gh CLI）
 
 ## 许可证
 
