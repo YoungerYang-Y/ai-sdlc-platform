@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import { WorkflowList } from "./pages/WorkflowList";
 import { WorkflowDetail } from "./pages/WorkflowDetail";
 import { WorkflowCreate } from "./pages/WorkflowCreate";
+import { CompareView } from "./pages/CompareView";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -19,6 +20,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<WorkflowList />} />
             <Route path="/workflows/new" element={<WorkflowCreate />} />
             <Route path="/workflows/:id" element={<WorkflowDetail />} />
+            <Route path="/compare" element={<CompareView />} />
           </Routes>
         </main>
       </div>

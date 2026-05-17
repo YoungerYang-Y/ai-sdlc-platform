@@ -97,3 +97,17 @@ export async function createWorkflow(input: {
   }
   return res.json();
 }
+
+export interface ScorecardData {
+  workflowId: string;
+  implementation: string | null;
+  status: string | null;
+  durationMs: number | null;
+  scorecard: { success: number; efficiency: number; cost: number; total: number } | null;
+}
+
+export async function fetchCompare(a: string, b: string): Promise<{ a: ScorecardData; b: ScorecardData }> {
+  const res = await fetch(`${BASE}/scorecards/compare?a=${a}&b=${b}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}

@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { fetchWorkflows, type WorkflowSummary } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 
 const TABS = ["all", "running", "completed", "failed"] as const;
 
 export function WorkflowList() {
+  const navigate = useNavigate();
   const [workflows, setWorkflows] = useState<WorkflowSummary[]>([]);
   const [tab, setTab] = useState<string>("all");
   const [error, setError] = useState<string>("");
+  const [selected, setSelected] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
 
   const load = async () => {
@@ -39,6 +41,12 @@ export function WorkflowList() {
             {t === "all" ? "全部" : t}
           </button>
         ))}
+        {selected.length === 2 && (
+          <button onClick={() => navigate(`/compare?a=${selected[0]}&b=${selected[1]}`)}
+            className="ml-auto bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700">
+            对比已选 ({selected.length})
+          </button>
+        )}
       </div>
 
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
@@ -52,6 +60,7 @@ export function WorkflowList() {
         <table className="w-full text-sm border rounded overflow-hidden">
           <thead className="bg-gray-100">
             <tr>
+              <th className="px-3 py-2 w-8"></th>
               <th className="text-left px-3 py-2">ID</th>
               <th className="text-left px-3 py-2">状态</th>
               <th className="text-left px-3 py-2">需求</th>
@@ -61,6 +70,10 @@ export function WorkflowList() {
           <tbody>
             {workflows.map(w => (
               <tr key={w.id} className="border-t hover:bg-gray-50">
+                <td className="px-3 py-2">
+                  <input type="checkbox" checked={selected.includes(w.id)}
+                    onChange={() => setSelected(s => s.includes(w.id) ? s.filter(x => x !== w.id) : s.length < 2 ? [...s, w.id] : [s[1]!, w.id])} />
+                </td>
                 <td className="px-3 py-2"><Link to={`/workflows/${w.id}`} className="text-blue-600 font-mono text-xs">{w.id.slice(0, 8)}</Link></td>
                 <td className="px-3 py-2"><StatusBadge status={w.status} /></td>
                 <td className="px-3 py-2 truncate max-w-xs">{w.requirement ?? "-"}</td>
