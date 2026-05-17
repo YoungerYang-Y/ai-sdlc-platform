@@ -53,22 +53,26 @@ updated: 2026-05-17
 ### T3: 重写 Code Worker handler
 - depends_on: [T1, T2]
 - scope: `workers/code-worker/src/index.ts`
-- verify: `cd workers/code-worker && pnpm typecheck`
+- verify: `cd workers/code-worker && pnpm test && pnpm typecheck`
 - agent: main
 - status: todo
 - deliverable: `workers/code-worker/src/index.ts` 重写
 
 变更：
 - code step：acquire workspace → resolveCliCommand → spawn CLI with requirement → git diff → save patch artifact → complete
-- verify step：acquire workspace（复用） → spawn verifyCommand → save log artifact → complete/fail
+- verify step：acquire workspace（复用，不 reset） → spawn verifyCommand → save log artifact → complete/fail
 - git diff 为空 → return failed("business_error", "no changes generated")
 - verifyCommand 未指定 → 直接 complete
 - 保留 `--mock` 开关兼容现有测试
 
+重试语义（必须遵循）：
+- **code step attempt 失败重试**：WorkspaceManager.reset() 恢复干净状态 → 重新运行 CLI（新 attempt 全新生成代码）
+- **verify step 失败**：不 reset 工作目录（验证的是 code 产出），由 Orchestrator onFailure 策略决定 workflow 行为（当前为 abort）
+
 ### T4: 增强 Review Worker handler
 - depends_on: [T1, T2]
 - scope: `workers/review-worker/src/index.ts`
-- verify: `cd workers/review-worker && pnpm typecheck`
+- verify: `cd workers/review-worker && pnpm test && pnpm typecheck`
 - agent: main
 - status: todo
 - deliverable: `workers/review-worker/src/index.ts` 修改
@@ -105,7 +109,7 @@ updated: 2026-05-17
 
 ## 决策日志
 
-<!-- 执行过程中记录 -->
+- 2026-05-17 — WorkspaceManager 和 CLI Resolver 放在 `workers/code-worker/src/` 而非 design.md 初始提议的 `packages/runtime/src/` — Runtime 模块职责是进程执行抽象，不应耦合 git 仓库管理；WorkspaceManager 是 Code Worker 特有的执行策略。design.md 已同步修正路径。
 
 ## 风险与阻塞
 
