@@ -164,17 +164,21 @@ async function handleVerify(ctx: TaskContext, verifyCommand?: string): Promise<T
   }
 }
 
+const DIFF_EXCLUDE = ["node_modules", "dist", "build", ".next", "__pycache__", ".venv", "vendor", "target"];
+
 async function gitDiff(cwd: string): Promise<string> {
-  const tracked = await execOutput("git", ["diff", "HEAD"], cwd);
+  const excludeArgs = DIFF_EXCLUDE.flatMap(p => ["--", `:!${p}`]);
+  const tracked = await execOutput("git", ["diff", "HEAD", ...excludeArgs], cwd);
   const untracked = await execOutput("git", ["ls-files", "--others", "--exclude-standard"], cwd);
 
+  // Filter untracked files that aren't in excluded dirs
+  const relevantUntracked = untracked.trim().split("\n").filter(f => f && !DIFF_EXCLUDE.some(ex => f.startsWith(ex + "/")));
+
   let patch = tracked;
-  if (untracked.trim()) {
-    const files = untracked.trim().split("\n");
-    // Stage untracked files to include in diff, then clean up
-    await execVoid("git", ["add", "-N", ...files], cwd);
-    patch = await execOutput("git", ["diff", "HEAD"], cwd);
-    await execVoid("git", ["reset", "HEAD", "--", ...files], cwd);
+  if (relevantUntracked.length > 0) {
+    await execVoid("git", ["add", "-N", ...relevantUntracked], cwd);
+    patch = await execOutput("git", ["diff", "HEAD", ...excludeArgs], cwd);
+    await execVoid("git", ["reset", "HEAD", "--", ...relevantUntracked], cwd);
   }
   return patch;
 }
