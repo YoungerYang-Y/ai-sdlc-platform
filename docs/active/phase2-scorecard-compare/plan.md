@@ -1,6 +1,6 @@
 ---
 id: plan-phase2-scorecard-compare
-status: not-started
+status: done
 owner: "evan"
 tags: [phase2, experiment, scorecard]
 created: 2026-05-17
@@ -24,7 +24,7 @@ updated: 2026-05-17
 - scope: `apps/orchestrator/src/index.ts`
 - verify: `cd apps/orchestrator && pnpm typecheck`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 比较 API 端点
 
 逻辑：
@@ -37,7 +37,7 @@ updated: 2026-05-17
 - scope: `apps/dashboard/src/api.ts`, `apps/dashboard/src/main.tsx`
 - verify: `cd apps/dashboard && pnpm typecheck`
 - agent: main
-- status: todo
+- status: done
 - deliverable: fetchCompare 函数 + /compare 路由注册
 
 ### T3: CompareView 页面
@@ -45,7 +45,7 @@ updated: 2026-05-17
 - scope: `apps/dashboard/src/pages/CompareView.tsx`
 - verify: `cd apps/dashboard && pnpm typecheck`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 并排对比视图（workflow info + 维度评分条 + 总分 + 胜出标识）
 
 ### T4: WorkflowList 增加对比入口
@@ -53,7 +53,7 @@ updated: 2026-05-17
 - scope: `apps/dashboard/src/pages/WorkflowList.tsx`
 - verify: `cd apps/dashboard && pnpm typecheck`
 - agent: main
-- status: todo
+- status: done
 - deliverable: 复选框 + "对比"按钮，选中 2 个后跳转 /compare?a=x&b=y
 
 ### T5: 验证
@@ -61,7 +61,7 @@ updated: 2026-05-17
 - scope: 全局
 - verify: `pnpm typecheck && pnpm --filter @ai-sdlc/dashboard build`
 - agent: main
-- status: todo
+- status: done
 - deliverable: typecheck + build 通过，手动验证对比功能
 
 ## 决策日志
@@ -74,7 +74,7 @@ updated: 2026-05-17
 
 ## 完成标准
 
-- [ ] 所有任务 status = done
-- [ ] `pnpm typecheck` 全通过
-- [ ] `pnpm --filter @ai-sdlc/dashboard build` 成功
-- [ ] 手动验证：两个 completed workflow 的 scorecard 对比正确展示
+- [x] 所有任务 status = done
+- [x] `pnpm typecheck` 全通过
+- [x] `pnpm --filter @ai-sdlc/dashboard build` 成功
+- [x] 手动验证：两个 completed workflow 的 scorecard 对比正确展示
