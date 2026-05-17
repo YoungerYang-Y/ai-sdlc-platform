@@ -23,6 +23,7 @@ async function handler(ctx: TaskContext): Promise<TaskResult> {
   const branch = params?.branch as string | undefined;
   const workDir = params?.workDir as string | undefined;
   const verifyCommand = params?.verifyCommand as string | undefined;
+  const taskImplementation = (params?.implementation as string) ?? implementation;
 
   logger.info("executing", { taskType: taskRun.taskType, stepId, mock });
 
@@ -34,7 +35,7 @@ async function handler(ctx: TaskContext): Promise<TaskResult> {
     return handleVerify(ctx, verifyCommand);
   }
 
-  return handleCode(ctx, requirement, repository, branch, workDir);
+  return handleCode(ctx, requirement, repository, branch, workDir, taskImplementation);
 }
 
 async function handleMock(ctx: TaskContext, stepId: string, requirement: string): Promise<TaskResult> {
@@ -60,7 +61,7 @@ async function handleMock(ctx: TaskContext, stepId: string, requirement: string)
   return { status: "completed", artifactRefs: [ref], finalConclusion: `${stepId} completed (mock)` };
 }
 
-async function handleCode(ctx: TaskContext, requirement: string, repository?: string, branch?: string, workDir?: string): Promise<TaskResult> {
+async function handleCode(ctx: TaskContext, requirement: string, repository?: string, branch?: string, workDir?: string, impl?: string): Promise<TaskResult> {
   const { taskRun, evidence, abortSignal, logger } = ctx;
 
   // Acquire workspace (always reset for code step to ensure clean state)
@@ -70,7 +71,7 @@ async function handleCode(ctx: TaskContext, requirement: string, repository?: st
   evidence.append("context_loaded", { requirement, repository, branch, commit: ws.baseCommit });
 
   // Resolve CLI
-  const cli = await resolveCliCommand(implementation);
+  const cli = await resolveCliCommand(impl ?? implementation);
   logger.info("cli resolved", { name: cli.name });
 
   // Execute CLI

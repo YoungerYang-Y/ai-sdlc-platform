@@ -75,6 +75,7 @@ export async function createWorkflow(input: {
   workDir?: string;
   verifyCommand?: string;
   triggerType?: string;
+  implementation?: string;
 }): Promise<WorkflowDetail> {
   const res = await fetch(`${BASE}/workflows`, {
     method: "POST",
@@ -88,6 +89,7 @@ export async function createWorkflow(input: {
         branch: input.branch || undefined,
         workDir: input.workDir || undefined,
         verifyCommand: input.verifyCommand || undefined,
+        implementation: input.implementation || undefined,
       },
     }),
   });

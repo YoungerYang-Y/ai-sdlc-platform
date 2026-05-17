@@ -5,7 +5,7 @@ import { createWorkflow, fetchWorkflow } from "../api";
 export function WorkflowCreate() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [form, setForm] = useState({ requirement: "", repository: "", workDir: "", branch: "", verifyCommand: "", triggerType: "manual" });
+  const [form, setForm] = useState({ requirement: "", repository: "", workDir: "", branch: "", verifyCommand: "", triggerType: "manual", implementation: "kiro" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +22,7 @@ export function WorkflowCreate() {
           branch: input.branch ?? "",
           verifyCommand: input.verifyCommand ?? "",
           triggerType: wf.trigger_type ?? "manual",
+          implementation: input.implementation ?? "kiro",
         });
       }).catch(() => {});
     }
@@ -61,6 +62,14 @@ export function WorkflowCreate() {
             className="border rounded px-3 py-2 w-full text-sm">
             <option value="manual">manual（交付模式）</option>
             <option value="experiment">experiment（实验模式）</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Implementation</label>
+          <select value={form.implementation} onChange={e => set("implementation", e.target.value)}
+            className="border rounded px-3 py-2 w-full text-sm">
+            <option value="kiro">kiro（Kiro CLI）</option>
+            <option value="codex">codex（Codex CLI）</option>
           </select>
         </div>
 
