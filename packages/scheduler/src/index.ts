@@ -9,6 +9,7 @@ export interface SchedulerConfig {
   defaultMaxAttempts?: number;
   onTaskCompleted: (taskRun: TaskRun) => void;
   onTaskFailed: (taskRun: TaskRun) => void;
+  onAttemptFinished?: (attemptId: string) => void;
 }
 
 export interface SubmitTaskInput {
@@ -92,6 +93,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     if (!["claimed", "running"].includes(attempt.status)) throw new Error("INVALID_STATE");
     await repo.updateAttemptStatus(attemptId, "completed");
     await repo.updateTaskStatus(attempt.taskRunId, "completed");
+    try { config.onAttemptFinished?.(attemptId); } catch (err) { console.error("onAttemptFinished failed", err); }
     const taskRun = await repo.findTaskRun(attempt.taskRunId);
     if (taskRun) config.onTaskCompleted(taskRun);
   }
@@ -101,6 +103,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
     if (!attempt || attempt.leaseToken !== leaseToken) throw new Error("INVALID_LEASE");
     if (!["claimed", "running"].includes(attempt.status)) throw new Error("INVALID_STATE");
     await repo.updateAttemptStatus(attemptId, "failed", { failureType, failureReason });
+    try { config.onAttemptFinished?.(attemptId); } catch (err) { console.error("onAttemptFinished failed", err); }
 
     const taskRun = await repo.findTaskRun(attempt.taskRunId);
     if (!taskRun) return;

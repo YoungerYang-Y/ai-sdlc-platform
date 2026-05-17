@@ -28,6 +28,7 @@ interface OrchestratorConfig {
   port: number;
   connectionString: string;
   schedulerConfig?: { leaseDefaultMs?: number; leaseScanIntervalMs?: number };
+  onAttemptFinished?: (attemptId: string) => void;
 }
 
 // --- Orchestrator ---
@@ -190,6 +191,7 @@ export function createOrchestrator(config: OrchestratorConfig) {
         ...config.schedulerConfig,
         onTaskCompleted: (t) => void handleTaskCompleted(t).catch((err) => console.error("handleTaskCompleted failed", err)),
         onTaskFailed: (t) => void handleTaskFailed(t).catch((err) => console.error("handleTaskFailed failed", err)),
+        onAttemptFinished: config.onAttemptFinished,
       });
       await scheduler.start();
       serve({ fetch: app.fetch, port: config.port });

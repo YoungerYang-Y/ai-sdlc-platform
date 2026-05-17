@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdlc/artifact": "workspace:*",
+    "@ai-sdlc/evaluation": "workspace:*",
     "@ai-sdlc/observability": "workspace:*",
     "@ai-sdlc/scheduler": "workspace:*",
     "@ai-sdlc/workflow": "workspace:*",

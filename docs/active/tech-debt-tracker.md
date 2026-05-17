@@ -7,7 +7,6 @@
 | ID | 标题 | Owner | 发现日期 | 优先级 | 影响范围 | 描述 | 建议方案 |
 |----|------|-------|----------|--------|----------|------|----------|
 | TD-001 | lint-docs.ts 缺少双轨演进可检测规则 | evan | 2026-05-16 | P1 | `arch-dual-track-roadmap.md` §5 的 3 条规则 | 3 条可自动检测规则（README Phase 段必须含交付+实验关键词、ARCHITECTURE 必须含四个核心对象标识符、Phase 段禁止纯 bullet 清单）尚未实现，仅靠人工审查 | 创建 `scripts/lint-arch-rules.ts` 或扩展 `lint-docs.ts`，集成到 CI |
-| TD-002 | evaluation 模块未实现基础 rule-scorer | ORPHAN | 2026-05-17 | P2 | `packages/evaluation` | plan T10 要求实现 rule-scorer.ts 从 pending_eval_jobs 消费并写入 attempt_scorecards，当前仅导出空对象 | 实现最小 rule-scorer 或 placeholder consumer |
 | TD-003 | insights 模块未实现任何功能 | ORPHAN | 2026-05-17 | P2 | `packages/insights` | 模块仅导出空对象，相似组分析、标签传播等功能完全缺失 | Phase 2 实现基础洞察聚合 |
 
 ---

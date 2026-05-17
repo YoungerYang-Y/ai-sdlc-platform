@@ -149,8 +149,18 @@ export function createObservability(config: ObservabilityConfig) {
     return c.json(events);
   });
 
+  async function notifyFinished(attemptId: string): Promise<void> {
+    await ensureRecord(attemptId);
+    await sql`
+      UPDATE attempt_observability_records SET finished_received_at = now(), updated_at = now()
+      WHERE attempt_id = ${attemptId}
+    `;
+    await transitionState(attemptId);
+  }
+
   return {
     app,
+    notifyFinished,
     async start() {
       scanTimer = setInterval(() => void scanOrphans(), config.orphanScanIntervalMs ?? 300000);
       serve({ fetch: app.fetch, port: config.port });

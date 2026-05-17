@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdlc/observability": "workspace:*",
-    "@ai-sdlc/artifact": "workspace:*"
+    "@ai-sdlc/artifact": "workspace:*",
+    "postgres": "^3.4.9"
   }
 }
