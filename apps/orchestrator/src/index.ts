@@ -7,6 +7,11 @@ import type { TaskRun } from "@ai-sdlc/worker-sdk";
 
 // --- Types ---
 
+interface StepParams {
+  stepId: string;
+  [key: string]: unknown;
+}
+
 interface WorkflowRun {
   id: string;
   versionSetId: string;
@@ -89,7 +94,7 @@ export function createOrchestrator(config: OrchestratorConfig) {
     const [row] = await sql`SELECT * FROM workflow_runs WHERE id = ${taskRun.workflowRunId}`;
     if (!row) return;
 
-    const stepId = (taskRun.params as any)?.stepId as string;
+    const stepId = (taskRun.params as StepParams | null)?.stepId;
     if (!stepId) return;
 
     const prevCompleted: string[] = row.completed_steps ?? [];
@@ -109,7 +114,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
     if (!row) return;
 
     const definition = getWorkflow(row.workflow_definition_id);
-    const stepId = (taskRun.params as any)?.stepId as string;
+    const stepId = (taskRun.params as StepParams | null)?.stepId;
+    if (!stepId) return;
     const stepDef = definition.steps.find((s) => s.stepId === stepId);
 
     if (stepDef?.onFailure === "skip") {
@@ -129,6 +135,9 @@ export function createOrchestrator(config: OrchestratorConfig) {
   // --- Orchestrator API ---
   app.post("/workflows", async (c) => {
     const body = await c.req.json();
+    if (!body.versionSetId || !body.triggerType || !body.input) {
+      return c.json({ error: "Missing required fields: versionSetId, triggerType, input" }, 400);
+    }
     const run = await createWorkflowRun(body);
     return c.json(run, 201);
   });
@@ -179,8 +188,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
       scheduler = createScheduler({
         connectionString: config.connectionString,
         ...config.schedulerConfig,
-        onTaskCompleted: (t) => void handleTaskCompleted(t),
-        onTaskFailed: (t) => void handleTaskFailed(t),
+        onTaskCompleted: (t) => void handleTaskCompleted(t).catch((err) => console.error("handleTaskCompleted failed", err)),
+        onTaskFailed: (t) => void handleTaskFailed(t).catch((err) => console.error("handleTaskFailed failed", err)),
       });
       await scheduler.start();
       serve({ fetch: app.fetch, port: config.port });

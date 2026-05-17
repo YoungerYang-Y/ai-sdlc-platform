@@ -14,6 +14,8 @@ describe("Scheduler", () => {
   beforeEach(async () => {
     sql = postgres(DB_URL);
     await sql`DELETE FROM pending_eval_jobs`;
+    await sql`DELETE FROM attempt_scorecard_revisions`;
+    await sql`DELETE FROM attempt_scorecards`;
     await sql`DELETE FROM attempt_observability_records`;
     await sql`DELETE FROM attempt_summary_reports`;
     await sql`DELETE FROM attempt_evidence_events`;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { TaskRun, WorkerAttempt, TaskType, ClaimRequest, ClaimResponse, FailureType } from "@ai-sdlc/worker-sdk";
-import { SchedulerRepository, createSql, type Sql } from "./repository.js";
+import { SchedulerRepository, createSql } from "./repository.js";
 
 export interface SchedulerConfig {
   connectionString: string;
@@ -37,7 +37,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   const leaseScanIntervalMs = config.leaseScanIntervalMs ?? 30000;
   const defaultMaxAttempts = config.defaultMaxAttempts ?? 3;
 
-  const sql: Sql = createSql(config.connectionString);
+  const sql = createSql(config.connectionString);
   const repo = new SchedulerRepository(sql);
   let scanTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -56,24 +56,27 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   }
 
   async function handleClaim(req: ClaimRequest): Promise<ClaimResponse | null> {
-    const taskRun = await repo.findAndLockReadyTask(req.supportedTaskTypes);
-    if (!taskRun) return null;
+    return sql.begin(async (tx) => {
+      const txRepo = new SchedulerRepository(tx);
+      const taskRun = await txRepo.findAndLockReadyTask(req.supportedTaskTypes);
+      if (!taskRun) return null;
 
-    await repo.updateTaskStatus(taskRun.id, "claimed");
+      await txRepo.updateTaskStatus(taskRun.id, "claimed");
 
-    const attempt = await repo.createAttempt({
-      taskRunId: taskRun.id,
-      workerId: req.workerId,
-      implementation: req.implementation,
-      versionSetId: req.versionSetId,
-      attemptNumber: taskRun.currentAttemptCount + 1,
-      leaseToken: randomUUID(),
-      leaseExpiresAt: new Date(Date.now() + leaseDefaultMs),
+      const attempt = await txRepo.createAttempt({
+        taskRunId: taskRun.id,
+        workerId: req.workerId,
+        implementation: req.implementation,
+        versionSetId: req.versionSetId,
+        attemptNumber: taskRun.currentAttemptCount + 1,
+        leaseToken: randomUUID(),
+        leaseExpiresAt: new Date(Date.now() + leaseDefaultMs),
+      });
+
+      await txRepo.incrementAttemptCount(taskRun.id);
+
+      return { taskRun, attempt, leaseToken: attempt.leaseToken, leaseDurationMs: leaseDefaultMs };
     });
-
-    await repo.incrementAttemptCount(taskRun.id);
-
-    return { taskRun, attempt, leaseToken: attempt.leaseToken, leaseDurationMs: leaseDefaultMs };
   }
 
   async function handleHeartbeat(attemptId: string, leaseToken: string): Promise<{ leaseDurationMs: number }> {
@@ -86,6 +89,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   async function handleComplete(attemptId: string, leaseToken: string, artifactRefs: string[]): Promise<void> {
     const attempt = await repo.findAttempt(attemptId);
     if (!attempt || attempt.leaseToken !== leaseToken) throw new Error("INVALID_LEASE");
+    if (!["claimed", "running"].includes(attempt.status)) throw new Error("INVALID_STATE");
     await repo.updateAttemptStatus(attemptId, "completed");
     await repo.updateTaskStatus(attempt.taskRunId, "completed");
     const taskRun = await repo.findTaskRun(attempt.taskRunId);
@@ -95,6 +99,7 @@ export function createScheduler(config: SchedulerConfig): Scheduler {
   async function handleFail(attemptId: string, leaseToken: string, failureType: FailureType, failureReason: string): Promise<void> {
     const attempt = await repo.findAttempt(attemptId);
     if (!attempt || attempt.leaseToken !== leaseToken) throw new Error("INVALID_LEASE");
+    if (!["claimed", "running"].includes(attempt.status)) throw new Error("INVALID_STATE");
     await repo.updateAttemptStatus(attemptId, "failed", { failureType, failureReason });
 
     const taskRun = await repo.findTaskRun(attempt.taskRunId);

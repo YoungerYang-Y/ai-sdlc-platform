@@ -23,26 +23,26 @@ export function createObservability(config: ObservabilityConfig) {
   }
 
   async function transitionState(attemptId: string): Promise<void> {
-    const [rec] = await sql`SELECT * FROM attempt_observability_records WHERE attempt_id = ${attemptId}`;
-    if (!rec) return;
-
-    const hasFinished = !!rec.finished_received_at;
-    const hasSummary = !!rec.summary_received_at;
-
-    let newState = rec.state;
-    if (hasFinished && hasSummary) {
-      newState = "complete";
-    } else if (hasFinished && !hasSummary) {
-      newState = "finished_pending_summary";
-    } else if (!hasFinished && hasSummary) {
-      newState = "summary_pending_finished";
-    }
-
-    if (newState !== rec.state) {
-      await sql`UPDATE attempt_observability_records SET state = ${newState}, updated_at = now() WHERE attempt_id = ${attemptId}`;
-      if (newState === "complete") {
-        await triggerEvaluation(attemptId);
-      }
+    const [updated] = await sql`
+      WITH computed AS (
+        SELECT attempt_id, state AS old_state,
+          CASE
+            WHEN finished_received_at IS NOT NULL AND summary_received_at IS NOT NULL THEN 'complete'
+            WHEN finished_received_at IS NOT NULL AND summary_received_at IS NULL THEN 'finished_pending_summary'
+            WHEN finished_received_at IS NULL AND summary_received_at IS NOT NULL THEN 'summary_pending_finished'
+            ELSE state
+          END AS new_state
+        FROM attempt_observability_records
+        WHERE attempt_id = ${attemptId}
+      )
+      UPDATE attempt_observability_records r
+      SET state = c.new_state, updated_at = now()
+      FROM computed c
+      WHERE r.attempt_id = c.attempt_id AND c.new_state != c.old_state
+      RETURNING r.state
+    `;
+    if (updated?.state === "complete") {
+      await triggerEvaluation(attemptId);
     }
   }
 
@@ -83,6 +83,7 @@ export function createObservability(config: ObservabilityConfig) {
 
     await ensureRecord(attemptId);
 
+    // TODO: Phase 2 — 使用 UNNEST 批量插入或 CTE 替代逐条 INSERT，提升大批量性能
     for (const event of events) {
       await sql`
         INSERT INTO attempt_evidence_events (event_id, attempt_id, sequence_no, event_type, occurred_at, payload_ref, payload_inline)

@@ -1,9 +1,11 @@
 import postgres from "postgres";
 import type { TaskRun, WorkerAttempt, TaskType, FailureType } from "@ai-sdlc/worker-sdk";
 
-export type Sql = postgres.Sql;
+// 联合类型允许 SchedulerRepository 同时接受普通连接和事务连接。
+// 内部仅使用 tagged template query（两者都支持）；.begin() 等方法仅在 createSql() 返回的 postgres.Sql 上可用。
+export type Sql = postgres.Sql | postgres.TransactionSql;
 
-export function createSql(connectionString: string): Sql {
+export function createSql(connectionString: string): postgres.Sql {
   return postgres(connectionString);
 }
 

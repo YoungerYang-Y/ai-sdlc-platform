@@ -52,6 +52,7 @@ export interface FileSystemStoreConfig {
 
 export class FileSystemArtifactStore implements ArtifactStore {
   private basePath: string;
+  // TODO: Phase 2 — 元数据持久化到 PostgreSQL artifacts 表，当前进程重启后丢失
   private metadata = new Map<string, ArtifactMetadata>();
 
   constructor(config: FileSystemStoreConfig) {
