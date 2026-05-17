@@ -176,6 +176,7 @@ sequenceDiagram
 |------|------|----------|------|
 | Code Worker | `workers/code-worker/src/workspace.ts` | 新增 | WorkspaceManager 实现 |
 | Code Worker | `workers/code-worker/src/cli-resolver.ts` | 新增 | CLI 检测和 fallback 逻辑 |
+| Code Worker | `workers/code-worker/src/delivery.ts` | 新增 | DeliveryManager（commit + push + gh pr create） |
 | Code Worker | `workers/code-worker/src/index.ts` | 重写 | 分离 code/verify 逻辑，接入 WorkspaceManager |
 | Review Worker | `workers/review-worker/src/index.ts` | 修改 | 加载前序 patch，改进 prompt |
 | Orchestrator | `apps/orchestrator/src/index.ts` | 修改 | 传递 workflow input 中的 repo/verifyCommand 到 task params |
@@ -190,6 +191,33 @@ sequenceDiagram
 - 进程重启清理策略：启动时扫描 `WORKSPACE_BASE_PATH` 下的子目录，删除超过 24 小时未修改的目录（孤儿清理）
 - 工作目录基础路径：`/tmp/ai-sdlc-workspaces/`（可通过 `WORKSPACE_BASE_PATH` 环境变量覆盖）
 - 所有 shell 命令使用 `spawn` 数组形式，禁止字符串拼接
+
+### PR 交付流程（DeliveryManager）
+
+仅在满足条件时触发：`triggerType === "manual"` 且 `mode === "cloned"`（托管模式）。
+
+**新增组件**：`workers/code-worker/src/delivery.ts`
+
+```typescript
+interface DeliveryManager {
+  shouldDeliver(triggerType: string, mode: "local" | "cloned"): boolean;
+  deliver(params: {
+    workDir: string;
+    branch: string;
+    requirement: string;
+    workflowRunId: string;
+    reviewReport: string;
+  }): Promise<{ prUrl?: string; error?: string }>;
+}
+```
+
+**执行时机**：Orchestrator 在 review task completed 后、标记 workflow completed 前调用。
+
+**分支命名**：`ai-sdlc/<workflowRunId 前 8 位>`，冲突时追加 `-<timestamp>`。
+
+**Best-effort 语义**：PR 创建失败不阻塞 workflow 完成。记录警告，PR URL 为空。
+
+**gh CLI 检测**：启动时一次性检测，不可用则跳过整个 deliver 流程。
 
 ## 迁移与兼容
 

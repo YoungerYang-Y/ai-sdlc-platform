@@ -98,7 +98,7 @@ updated: 2026-05-17
 - `POST /workflows` 输入校验扩展：repository 或 workDir 至少提供一个
 
 ### T6: 集成测试
-- depends_on: [T3, T4, T5]
+- depends_on: [T3, T4, T5, T7]
 - scope: `tests/e2e-real.test.ts`, `workers/code-worker/tests/`, `tests/fixtures/mock-cli.sh`
 - verify: `pnpm test`
 - agent: main
@@ -110,7 +110,26 @@ updated: 2026-05-17
 - Code Worker 集成测试：用真实 git 仓库（`git init` 临时仓库）+ mock-cli.sh 验证全链路
 - 工作目录清理断言：verify workflow 结束后，WorkspaceManager.release() 被调用，临时目录已删除
 - 验证 observability 链路：evidence + summary + scorecard 在非 mock handler 下正常生成
+- PR 创建测试：mock gh CLI 验证 delivery mode 下调用正确参数
 - 可选 E2E（`RUN_REAL_E2E=true`）：调用真实 Kiro CLI
+
+### T7: 实现 DeliveryManager（commit + push + PR）
+- depends_on: [T1]
+- scope: `workers/code-worker/src/delivery.ts`
+- verify: `cd workers/code-worker && pnpm test -- --grep "DeliveryManager"`
+- agent: main
+- status: todo
+- deliverable: `workers/code-worker/src/delivery.ts` + 单元测试
+
+功能：
+- `shouldDeliver(triggerType, mode)` → 仅 manual + cloned 返回 true
+- `deliver(params)` → git checkout -b → git add -A → git commit → git push → gh pr create
+- 分支名：`ai-sdlc/<workflowRunId 前 8 位>`
+- PR title：截取 requirement 前 60 字符
+- PR body：包含审查报告摘要
+- Best-effort：任何步骤失败返回 `{ error }` 不抛异常
+- gh 可用性启动时检测，不可用则 shouldDeliver 返回 false
+- 所有命令用 spawn 数组形式
 
 ## 决策日志
 
