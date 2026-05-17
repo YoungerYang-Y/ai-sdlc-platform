@@ -168,26 +168,54 @@ export function createOrchestrator(config: OrchestratorConfig) {
 
   app.get("/artifacts/*", async (c) => {
     const ref = c.req.path.replace("/artifacts/", "");
-    // Security: validate ref format (no path traversal)
-    if (!ref || ref.includes("..") || ref.startsWith("/") || !/^[a-z_]+\/[0-9a-f-]+\/[0-9a-f-]+\/[a-zA-Z0-9._-]+$/.test(ref)) {
+    if (!ref || ref.includes("..") || ref.startsWith("/")) {
       return c.json({ error: "invalid artifact ref" }, 400);
     }
     const { resolve, join } = await import("node:path");
-    const { readFile } = await import("node:fs/promises");
-    const basePath = process.env.ARTIFACT_PATH ?? "./artifacts";
-    const filePath = resolve(join(basePath, ref));
-    if (!filePath.startsWith(resolve(basePath))) {
+    const { readFile, readdir } = await import("node:fs/promises");
+    const { existsSync } = await import("node:fs");
+    const basePath = resolve(process.env.ARTIFACT_PATH ?? "./artifacts");
+    const targetPath = resolve(join(basePath, ref));
+    if (!targetPath.startsWith(basePath)) {
       return c.json({ error: "access denied" }, 403);
     }
     try {
-      const content = await readFile(filePath, "utf-8");
-      const ext = ref.split(".").pop();
-      const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
-      return c.text(content, 200, { "Content-Type": contentType });
+      // If exact file, return it
+      if (existsSync(targetPath) && (await import("node:fs")).statSync(targetPath).isFile()) {
+        const content = await readFile(targetPath, "utf-8");
+        const ext = ref.split(".").pop();
+        const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
+        return c.text(content, 200, { "Content-Type": contentType });
+      }
+      // If directory prefix, find first file recursively
+      if (existsSync(targetPath)) {
+        const files = await findFiles(targetPath);
+        if (files.length > 0) {
+          const content = await readFile(files[0]!, "utf-8");
+          const ext = files[0]!.split(".").pop();
+          const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
+          return c.text(content, 200, { "Content-Type": contentType });
+        }
+      }
+      return c.json({ error: "artifact not found" }, 404);
     } catch {
       return c.json({ error: "artifact not found" }, 404);
     }
   });
+
+  async function findFiles(dir: string): Promise<string[]> {
+    const { readdir, stat } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const entries = await readdir(dir);
+    const results: string[] = [];
+    for (const entry of entries) {
+      const full = join(dir, entry);
+      const s = await stat(full);
+      if (s.isFile()) results.push(full);
+      else if (s.isDirectory()) results.push(...await findFiles(full));
+    }
+    return results;
+  }
 
   app.post("/workflows/:id/cancel", async (c) => {
     await sql`UPDATE workflow_runs SET status = 'cancelled', finished_at = now(), updated_at = now() WHERE id = ${c.req.param("id")}`;
