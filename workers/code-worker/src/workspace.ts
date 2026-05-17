@@ -101,7 +101,18 @@ export class WorkspaceManager {
   }
 
   private async getHeadCommit(cwd: string): Promise<string> {
-    return (await this.execOutput("git", ["rev-parse", "HEAD"], cwd)).trim();
+    return new Promise((resolve, reject) => {
+      const proc = spawn("git", ["rev-parse", "HEAD"], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (d) => { stdout += d; });
+      proc.stderr?.on("data", (d) => { stderr += d; });
+      proc.on("close", (code) => {
+        if (code !== 0) reject(new Error(`Repository has no commits (git rev-parse HEAD failed). Ensure at least one commit exists.`));
+        else resolve(stdout.trim());
+      });
+      proc.on("error", reject);
+    });
   }
 
   private exec(cmd: string, args: string[], cwd?: string): Promise<void> {
