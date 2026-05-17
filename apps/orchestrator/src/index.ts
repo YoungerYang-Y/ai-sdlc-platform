@@ -167,7 +167,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
   });
 
   app.get("/artifacts/*", async (c) => {
-    const ref = c.req.path.replace("/artifacts/", "");
+    const url = new URL(c.req.url);
+    const ref = url.pathname.replace("/artifacts/", "");
     if (!ref || ref.includes("..") || ref.startsWith("/")) {
       return c.json({ error: "invalid artifact ref" }, 400);
     }
