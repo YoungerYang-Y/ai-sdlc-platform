@@ -6,7 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"no tests yet\"",
+    "test": "vitest run",
     "lint": "echo \"no lint yet\"",
     "typecheck": "tsc --noEmit"
   },
@@ -14,5 +14,8 @@
     "@ai-sdlc/worker-sdk": "workspace:*",
     "@ai-sdlc/runtime": "workspace:*",
     "@ai-sdlc/artifact": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.3"
   }
 }

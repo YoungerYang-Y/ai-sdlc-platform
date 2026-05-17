@@ -139,6 +139,12 @@ export function createOrchestrator(config: OrchestratorConfig) {
     if (!body.versionSetId || !body.triggerType || !body.input) {
       return c.json({ error: "Missing required fields: versionSetId, triggerType, input" }, 400);
     }
+    if (!body.input.requirement) {
+      return c.json({ error: "Missing input.requirement" }, 400);
+    }
+    if (!body.input.repository && !body.input.workDir) {
+      return c.json({ error: "Either input.repository or input.workDir must be provided" }, 400);
+    }
     const run = await createWorkflowRun(body);
     return c.json(run, 201);
   });
