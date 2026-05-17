@@ -157,6 +157,38 @@ export function createOrchestrator(config: OrchestratorConfig) {
     return c.json(row);
   });
 
+  app.get("/workflows", async (c) => {
+    const status = c.req.query("status");
+    const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
+    const rows = status
+      ? await sql`SELECT id, status, trigger_type, created_at, finished_at, input->>'requirement' as requirement FROM workflow_runs WHERE status = ${status} ORDER BY created_at DESC LIMIT ${limit}`
+      : await sql`SELECT id, status, trigger_type, created_at, finished_at, input->>'requirement' as requirement FROM workflow_runs ORDER BY created_at DESC LIMIT ${limit}`;
+    return c.json(rows);
+  });
+
+  app.get("/artifacts/*", async (c) => {
+    const ref = c.req.path.replace("/artifacts/", "");
+    // Security: validate ref format (no path traversal)
+    if (!ref || ref.includes("..") || ref.startsWith("/") || !/^[a-z_]+\/[0-9a-f-]+\/[0-9a-f-]+\/[a-zA-Z0-9._-]+$/.test(ref)) {
+      return c.json({ error: "invalid artifact ref" }, 400);
+    }
+    const { resolve, join } = await import("node:path");
+    const { readFile } = await import("node:fs/promises");
+    const basePath = process.env.ARTIFACT_PATH ?? "./artifacts";
+    const filePath = resolve(join(basePath, ref));
+    if (!filePath.startsWith(resolve(basePath))) {
+      return c.json({ error: "access denied" }, 403);
+    }
+    try {
+      const content = await readFile(filePath, "utf-8");
+      const ext = ref.split(".").pop();
+      const contentType = ext === "md" ? "text/markdown" : ext === "diff" ? "text/x-diff" : "text/plain";
+      return c.text(content, 200, { "Content-Type": contentType });
+    } catch {
+      return c.json({ error: "artifact not found" }, 404);
+    }
+  });
+
   app.post("/workflows/:id/cancel", async (c) => {
     await sql`UPDATE workflow_runs SET status = 'cancelled', finished_at = now(), updated_at = now() WHERE id = ${c.req.param("id")}`;
     return c.json({ ok: true });
