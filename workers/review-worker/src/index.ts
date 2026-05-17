@@ -118,4 +118,7 @@ async function main() {
   process.on("SIGINT", () => void worker.stop());
 }
 
-main().catch(console.error);
+const isMain = process.argv[1]?.includes("review-worker");
+if (isMain) {
+  main().catch(console.error);
+}

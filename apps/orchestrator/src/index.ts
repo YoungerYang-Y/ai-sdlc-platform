@@ -12,7 +12,7 @@ interface StepParams {
   [key: string]: unknown;
 }
 
-interface WorkflowRun {
+export interface WorkflowRun {
   id: string;
   versionSetId: string;
   workflowDefinitionId: string;
@@ -29,6 +29,8 @@ interface OrchestratorConfig {
   connectionString: string;
   schedulerConfig?: { leaseDefaultMs?: number; leaseScanIntervalMs?: number };
   onAttemptFinished?: (attemptId: string) => void;
+  onWorkflowCompleted?: (run: WorkflowRun) => void;
+  onWorkflowFailed?: (run: WorkflowRun) => void;
 }
 
 // --- Orchestrator ---
@@ -66,6 +68,7 @@ export function createOrchestrator(config: OrchestratorConfig) {
       // All steps done
       await sql`UPDATE workflow_runs SET status = 'completed', finished_at = now(), updated_at = now() WHERE id = ${run.id}`;
       run.status = "completed";
+      try { config.onWorkflowCompleted?.(run); } catch (err) { console.error("onWorkflowCompleted failed", err); }
       return;
     }
 
@@ -127,6 +130,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
       await advanceWorkflow(run);
     } else {
       await sql`UPDATE workflow_runs SET status = 'failed', finished_at = now(), updated_at = now() WHERE id = ${row.id}`;
+      const failedRun: WorkflowRun = { id: row.id, versionSetId: row.version_set_id, workflowDefinitionId: row.workflow_definition_id, status: "failed", triggerType: row.trigger_type, input: row.input as Record<string, unknown>, completedSteps: row.completed_steps ?? [], createdAt: row.created_at };
+      try { config.onWorkflowFailed?.(failedRun); } catch (err) { console.error("onWorkflowFailed failed", err); }
     }
   }
 
