@@ -5,6 +5,7 @@ owner: "evan"
 tags: [phase2, delivery, experiment, worker, runtime]
 created: 2026-05-17
 updated: 2026-05-17
+verified:
 ---
 
 # 设计：Phase 2 真实 Code Worker 集成
@@ -43,7 +44,7 @@ interface WorkspaceEntry {
 
 ### 接口契约
 
-**WorkspaceManager**（新增，`packages/runtime/src/workspace.ts`）：
+**WorkspaceManager**（新增，`workers/code-worker/src/workspace.ts`）：
 
 ```typescript
 interface WorkspaceManager {
@@ -59,16 +60,32 @@ interface WorkspaceManager {
 }
 ```
 
-**CLI 选择器**（新增，`packages/runtime/src/cli-resolver.ts`）：
+**模块归属论证**：WorkspaceManager 放在 `workers/code-worker/` 而非 `packages/runtime/`，原因：
+
+1. `packages/runtime` 的职责是"进程执行抽象"（spawn CLI、超时、取消），它不应知道 git 仓库的概念
+2. WorkspaceManager 是"为 Code Worker 准备工作目录"的策略层，不同 Worker 可能有不同的工作目录需求（Review Worker 不需要 clone）
+3. 若后续 Review Worker 也需要工作目录管理，再提取为 `packages/workspace` 共享模块（YAGNI）
+4. 避免 Runtime 模块向"万能工具包"退化——保持模块职责单一
+
+**CLI 选择器**（新增，`workers/code-worker/src/cli-resolver.ts`）：
 
 ```typescript
-// 返回可用 CLI 的命令前缀
-function resolveCliCommand(preferred: string): string[];
-// preferred="kiro" → 检测 PATH → 有则返回 ["kiro","chat","--no-interactive","--trust-all-tools"]
-// 无则 fallback → ["codex","--quiet","--task"]
+// 返回可用 CLI 的命令数组
+function resolveCliCommand(preferred: string): Promise<string[]>;
+// preferred="kiro" → which kiro → 有则返回 ["kiro","chat","--no-interactive","--trust-all-tools"]
+// 无则检测 codex → ["codex","--quiet","--task"]
+// 两者都无 → throw Error("NO_CLI_AVAILABLE")
 ```
 
 **Code Worker Handler 签名不变**（`(ctx: TaskContext) => Promise<TaskResult>`），内部逻辑重写。
+
+### 安全：shell 注入防护
+
+用户输入（repository URL、verifyCommand）直接用于 shell 命令，必须防护：
+
+1. **repository URL**：WorkspaceManager 使用数组形式传递给 `spawn`（如 `spawn("git", ["clone", "--branch", branch, "--depth", "1", url, destPath])`），不通过 shell 字符串拼接
+2. **verifyCommand**：通过 `spawn("sh", ["-c", verifyCommand])` 执行——verifyCommand 由 workflow 提交者（平台操作者）控制，非外部用户输入。在 `POST /workflows` 输入校验中做基础 allowlist 检查（禁止 `rm -rf /`、`curl | sh` 等危险模式）
+3. **所有 git 命令**：使用 `spawn` 数组形式，不使用 `exec` 或模板字符串拼接
 
 ### 核心流程
 
@@ -95,7 +112,7 @@ sequenceDiagram
 
   O->>S: submitTask(verify, {verifyCommand})
   S-->>CW: claim → verify task
-  CW->>WM: acquire(workflowRunId) → 同一 path
+  CW->>WM: acquire(workflowRunId) → 同一 path（不 reset）
   CW->>CW: exec(verifyCommand)
   CW->>A: write(verify.log)
   CW->>S: complete
@@ -109,7 +126,15 @@ sequenceDiagram
   RW->>S: complete
 ```
 
-### 重试流程
+### 重试语义
+
+重试发生在 **code step 级别**，不会单独重试 verify：
+
+- Workflow 定义中 code 和 verify 是两个独立的 `task_run`
+- 如果 **verify 失败**，Orchestrator 的 `onFailure` 策略决定行为：
+  - 当前 workflow 定义使用 `onFailure: "abort"`（默认），整个 workflow 标记 failed
+  - 后续可扩展为 `onFailure: "retry_from_code"`，重新提交 code task
+- 如果 **code step 自身重试**（attempt 失败但未耗尽 maxAttempts），Scheduler 将 task 回到 ready，新 attempt claim 时 WorkspaceManager 执行 reset：
 
 ```mermaid
 sequenceDiagram
@@ -119,23 +144,25 @@ sequenceDiagram
 
   S-->>CW: claim → code task (attempt #2)
   CW->>WM: acquire(workflowRunId)
-  Note over WM: 目录已存在，执行 reset
+  Note over WM: 目录已存在且有脏状态
   WM->>WM: git checkout . && git clean -fd
   WM-->>CW: {path, baseCommit}
-  CW->>CW: 正常执行 CLI
+  CW->>CW: 正常执行 CLI（全新 attempt）
 ```
+
+**关键区别**：
+- **code step retry**：reset 工作目录 → 重新运行 CLI（合理，因为要重新生成代码）
+- **verify step**：始终在 code 产出的工作目录上运行，不做 reset（verify 只读取 code 的产出）
 
 ## 影响范围
 
 | 模块 | 路径 | 变更类型 | 说明 |
 |------|------|----------|------|
-| Runtime | `packages/runtime/src/workspace.ts` | 新增 | WorkspaceManager 实现 |
-| Runtime | `packages/runtime/src/cli-resolver.ts` | 新增 | CLI 检测和 fallback 逻辑 |
-| Runtime | `packages/runtime/src/index.ts` | 修改 | 导出新模块 |
+| Code Worker | `workers/code-worker/src/workspace.ts` | 新增 | WorkspaceManager 实现 |
+| Code Worker | `workers/code-worker/src/cli-resolver.ts` | 新增 | CLI 检测和 fallback 逻辑 |
 | Code Worker | `workers/code-worker/src/index.ts` | 重写 | 分离 code/verify 逻辑，接入 WorkspaceManager |
 | Review Worker | `workers/review-worker/src/index.ts` | 修改 | 加载前序 patch，改进 prompt |
 | Orchestrator | `apps/orchestrator/src/index.ts` | 修改 | 传递 workflow input 中的 repo/verifyCommand 到 task params |
-| E2E 测试 | `tests/e2e.test.ts` | 修改 | 新增真实 CLI 集成测试（需要可执行的 CLI） |
 | E2E 测试 | `tests/e2e-real.test.ts` | 新增 | 独立的真实 CLI E2E（可选跳过） |
 
 ## 约束
@@ -144,8 +171,8 @@ sequenceDiagram
 - Kiro CLI / Codex CLI 必须在 Worker 宿主机 PATH 中可用
 - 仓库认证使用宿主机 SSH agent 或 credential helper
 - WorkspaceManager 纯内存状态，进程重启后工作目录需重新 acquire（重试机制会处理）
-- 工作目录基础路径：`/tmp/ai-sdlc-workspaces/` （可通过环境变量覆盖）
-- git 操作使用 shell 调用（不引入 git 库依赖）
+- 工作目录基础路径：`/tmp/ai-sdlc-workspaces/`（可通过 `WORKSPACE_BASE_PATH` 环境变量覆盖）
+- 所有 shell 命令使用 `spawn` 数组形式，禁止字符串拼接
 
 ## 迁移与兼容
 
@@ -159,7 +186,7 @@ sequenceDiagram
 
 ## 观测性
 
-已有 Phase 1 观测链路完全复用，无需新增：
+已有 Phase 1 观测链路完全复用，无需新增 metrics：
 
 - `context_loaded` evidence 记录 requirement + repository + commit
 - `tool_called` evidence 记录 CLI 名称、status、durationMs
@@ -167,8 +194,8 @@ sequenceDiagram
 - `attempt_summary_report` 记录 finalStatus + durationMs
 - `attempt_scorecard` 基于真实 durationMs 评分
 
-新增日志点：
-- WorkspaceManager clone/reset/release 操作记录（结构化日志）
+新增结构化日志：
+- WorkspaceManager clone/reset/release 操作（info 级别）
 - CLI resolver fallback 事件（warn 级别）
 
 ## 异常处理
@@ -176,10 +203,55 @@ sequenceDiagram
 | 异常 | 策略 | 重试 |
 |------|------|------|
 | git clone 失败（网络/认证） | 标记 infrastructure_error | ✓ 按 maxAttempts 重试 |
-| Kiro CLI 超时 | 通过 CliRuntime timeout 机制终止进程 | ✓ 重试 |
-| Kiro CLI 非零退出 | 标记 business_error，记录 stderr | ✓ 重试（可能是 flaky） |
-| git diff 为空 | 标记 business_error "no changes generated" | ✓ 重试（不同 attempt 可能成功） |
-| Kiro + Codex 均不在 PATH | 标记 infrastructure_error | ✗ 需人工修复环境 |
-| verifyCommand 执行失败 | 标记 business_error，保存日志 | ✓ 重试（reset 后重新 code） |
-| 工作目录丢失 | acquire 时检测并重新 clone | 自动恢复 |
-| Observability 上报失败 | try-catch 吞错误，不阻塞执行 | 继承 Phase 1 行为 |
+| Kiro CLI 超时 | CliRuntime timeout → 进程 SIGTERM | ✓ 重试 |
+| Kiro CLI 非零退出 | 标记 business_error，记录 stderr | ✓ 重试 |
+| git diff 为空 | 标记 business_error "no changes generated" | ✓ 重试 |
+| Kiro + Codex 均不在 PATH | 标记 infrastructure_error | ✗ 需人工修复 |
+| verifyCommand 执行失败 | 标记 business_error，保存日志 | workflow 级别由 Orchestrator 策略决定 |
+| 工作目录丢失 | acquire 时检测不存在 → 重新 clone | 自动恢复 |
+| Observability 上报失败 | try-catch 不阻塞执行 | 继承 Phase 1 行为 |
+
+## 验证方式
+
+### 单元测试
+
+| 组件 | 测试内容 | 方式 |
+|------|----------|------|
+| WorkspaceManager | acquire (clone/local)、reset、release、重入幂等 | 真实 git 操作 + 临时目录 |
+| CLI Resolver | PATH 检测、fallback 逻辑、两者都不可用 | mock `which` 命令 |
+| Code Worker handler | code step 产出 patch、verify step 执行命令 | mock CliRuntime + 真实 git repo |
+
+### 集成测试
+
+| 场景 | 测试内容 |
+|------|----------|
+| 完整 code → verify → review | 用真实 git 仓库 + mock CLI（返回固定 patch）验证全链路 |
+| clone 失败重试 | 模拟网络错误 → 验证 infrastructure_error + 重试行为 |
+| verify 失败 | 验证 workflow 标记 failed |
+| observability 链路 | 验证 evidence + summary + scorecard 在真实执行中正常生成 |
+
+### E2E 测试（可选，需要真实 CLI）
+
+- `tests/e2e-real.test.ts`：调用真实 Kiro/Codex CLI 在测试仓库上执行
+- 通过环境变量 `RUN_REAL_E2E=true` 控制是否执行
+- CI 中默认跳过（需要 CLI 认证），本地开发可手动运行
+
+## 备选方案
+
+### 方案 A（已否决）：WorkspaceManager 放在 packages/runtime
+
+- **优势**：集中管理所有"执行环境准备"能力
+- **否决原因**：Runtime 模块职责是"进程执行抽象"（spawn/timeout/cancel），不应耦合 git 仓库管理。WorkspaceManager 是 Worker 特有的执行策略，不同 Worker 可能需要不同的工作目录策略。放 Runtime 会让该模块变成"万能工具包"，违反单一职责。
+
+### 方案 B（已否决）：不保留工作目录，verify 时 apply patch
+
+- **优势**：每个 step 完全无状态，便于分布式调度
+- **否决原因**：
+  1. apply patch 后文件状态可能与 code step 产出不一致（patch 基于 clean state，但 CLI 可能修改了未 tracked 的文件如 lock files）
+  2. 增加不必要的复杂度——Phase 2 是单 Worker 串行模型，无需为分布式做提前设计
+  3. verify 需要完整的 node_modules、编译产物等中间状态，仅 patch 不够
+
+### 方案 C（已否决）：不做 CLI fallback，只支持 Kiro
+
+- **优势**：实现更简单，不需要检测逻辑
+- **否决原因**：开发环境可能没有 Kiro CLI（如 CI 只安装了 Codex），fallback 成本极低（十几行代码），但显著提升可用性
