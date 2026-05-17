@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { isInPath } from "./utils.js";
 
 export interface DeliverParams {
   workDir: string;
@@ -17,6 +18,9 @@ let ghAvailable: boolean | null = null;
 
 export class DeliveryManager {
   shouldDeliver(triggerType: string, mode: "local" | "cloned"): boolean {
+    if (ghAvailable === null) {
+      console.warn("DeliveryManager: shouldDeliver called before checkGhAvailability()");
+    }
     return triggerType === "manual" && mode === "cloned" && ghAvailable === true;
   }
 
@@ -53,14 +57,6 @@ export class DeliveryManager {
       return { branch, error: err.message ?? String(err) };
     }
   }
-}
-
-async function isInPath(cmd: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const proc = spawn("which", [cmd], { stdio: ["ignore", "ignore", "ignore"] });
-    proc.on("close", (code) => resolve(code === 0));
-    proc.on("error", () => resolve(false));
-  });
 }
 
 function execGit(args: string[], cwd: string): Promise<void> {

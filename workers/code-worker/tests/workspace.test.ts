@@ -23,7 +23,7 @@ describe("WorkspaceManager", () => {
 
   beforeEach(() => {
     basePath = mkdtempSync(join(tmpdir(), "ws-test-base-"));
-    wm = new WorkspaceManager(basePath);
+    wm = new WorkspaceManager(basePath, { allowFile: true });
     testRepo = createTestRepo();
   });
 

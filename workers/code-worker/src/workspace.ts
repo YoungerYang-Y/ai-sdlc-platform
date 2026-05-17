@@ -3,7 +3,8 @@ import { existsSync, statSync, readdirSync } from "node:fs";
 import { rm, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-const REPO_URL_PATTERN = /^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/;
+const REPO_URL_PATTERN = /^(https?:\/\/|git@|ssh:\/\/)/;
+const REPO_URL_PATTERN_WITH_FILE = /^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/;
 const ORPHAN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
 export interface WorkspaceEntry {
@@ -21,10 +22,12 @@ export interface AcquireParams {
 
 export class WorkspaceManager {
   private basePath: string;
+  private allowFile: boolean;
   private entries = new Map<string, WorkspaceEntry>();
 
-  constructor(basePath?: string) {
+  constructor(basePath?: string, opts?: { allowFile?: boolean }) {
     this.basePath = basePath ?? process.env.WORKSPACE_BASE_PATH ?? "/tmp/ai-sdlc-workspaces";
+    this.allowFile = opts?.allowFile ?? false;
   }
 
   async cleanOrphans(): Promise<void> {
@@ -41,6 +44,11 @@ export class WorkspaceManager {
     }
   }
 
+  /**
+   * Acquire workspace for a workflow run. Idempotent: returns existing directory if already acquired.
+   * Callers must call reset() before acquire() when retrying a code step (to restore clean state).
+   * Verify step should NOT reset — it operates on code step's output.
+   */
   async acquire(params: AcquireParams): Promise<{ path: string; baseCommit: string }> {
     const existing = this.entries.get(params.workflowRunId);
     if (existing) {
@@ -59,7 +67,8 @@ export class WorkspaceManager {
     }
 
     if (!params.repository) throw new Error("Either repository or workDir must be provided");
-    if (!REPO_URL_PATTERN.test(params.repository)) {
+    const pattern = this.allowFile ? REPO_URL_PATTERN_WITH_FILE : REPO_URL_PATTERN;
+    if (!pattern.test(params.repository)) {
       throw new Error(`Invalid repository URL format: ${params.repository}`);
     }
 
