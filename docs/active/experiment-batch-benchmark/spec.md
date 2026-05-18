@@ -76,8 +76,9 @@ updated: 2026-05-18
 ## 验收标准
 
 - [ ] Given 一个包含 3 个 case 的 suite, When 操作者发起 batch（2 个 version_set）, Then 系统创建 6 个 workflow_run 且 batch 状态为 running
+- [ ] Given 一个包含 2 个 case 的 suite, When 操作者发起 batch（3 个 version_set）, Then 系统创建 6 个 workflow_run（2 是最小值，3+ 同样工作）
 - [ ] Given 一个 batch 中所有 6 个 workflow_run 完成, When 查询 batch 详情, Then 返回 3×2 的 scorecard 对比结果且 batch 状态为 completed
-- [ ] Given 一个已完成的 workflow_run, When 操作者执行"转为 benchmark", Then 创建一个 benchmark_case 其 input 与原 workflow_run 一致
+- [ ] Given 一个已完成的 workflow_run, When 操作者执行"转为 benchmark", Then 创建一个 benchmark_case 其 input 仅包含 requirement/repository/branch/verifyCommand（忽略 workDir）
 - [ ] Given batch 中某个 workflow_run 失败, When 查询对比结果, Then 该单元格显示 failed 状态而非空白
 - [ ] Given Dashboard 实验页面, When 操作者点击某个 batch, Then 看到完整的对比表格含底部均值行
 
@@ -98,5 +99,5 @@ updated: 2026-05-18
 
 ## 度量与成功标准
 
-- 操作者能在 5 分钟内完成"创建 suite → 发起 batch → 查看对比"的完整闭环
+- 操作者完成"创建 suite → 添加 case → 发起 batch → 查看对比"闭环的操作步骤 ≤ 6 步（不含执行等待时间）
 - 对比结果能明确回答"配置 A 在哪些 case 上优于配置 B"

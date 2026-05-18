@@ -30,8 +30,8 @@ CREATE TABLE benchmark_cases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   suite_id UUID NOT NULL REFERENCES benchmark_suites(id),
   name TEXT NOT NULL,
-  input JSONB NOT NULL,  -- { requirement, repository?, branch?, workDir?, verifyCommand?, implementation? }
-  source_workflow_run_id UUID,  -- 非空表示从历史 workflow 转化
+  input JSONB NOT NULL,  -- { requirement, repository?, branch?, verifyCommand? }（不含 workDir）
+  source_workflow_run_id UUID REFERENCES workflow_runs(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -76,9 +76,35 @@ CREATE TABLE run_scorecards (
 | `/benchmark-suites/:id` | GET | — | suite + cases[] |
 | `/benchmark-suites/:id/cases` | POST | `{ name, input }` | 201 + case |
 | `/benchmark-suites/:id/cases/from-workflow` | POST | `{ workflowRunId, name? }` | 201 + case |
+
+**from-workflow 字段映射规则**：
+- 提取字段：`requirement`（必须）、`repository`、`branch`、`verifyCommand`
+- 忽略字段：`workDir`（本地路径对 benchmark 无意义）、`implementation`（由 version_set 决定）
+- `name` 默认值：`requirement` 前 80 字符截断
 | `/experiment-batches` | POST | `{ suiteId, versionSetIds }` | 201 + batch |
 | `/experiment-batches` | GET | — | batch[] |
-| `/experiment-batches/:id` | GET | — | batch + results matrix |
+| `/experiment-batches/:id` | GET | — | batch + results（见下方响应结构） |
+
+**GET /experiment-batches/:id 响应结构**：
+
+```json
+{
+  "id": "uuid", "suite_id": "uuid", "suite_name": "...",
+  "version_set_ids": ["uuid-a", "uuid-b"],
+  "status": "completed", "total_runs": 6, "completed_runs": 5, "failed_runs": 1,
+  "runs": [
+    {
+      "benchmark_case_id": "uuid", "case_name": "...",
+      "version_set_id": "uuid-a", "workflow_run_id": "uuid",
+      "workflow_status": "completed",
+      "dimension_scores": { "success": 1.0, "efficiency": 0.8, "cost": 0.9 },
+      "total_score": 0.9
+    }
+  ]
+}
+```
+
+客户端按 `(benchmark_case_id, version_set_id)` 构建矩阵视图。
 
 ### 核心流程
 
@@ -113,14 +139,14 @@ sequenceDiagram
 
 ### run_scorecard 聚合逻辑
 
+**Phase 2 简化决策**：当前 workflow 为线性链（code → verify → review），每个 step 通常只有一个最终 attempt。因此 run_scorecard 直接取最终 attempt（最后完成/失败的 step）的 attempt_scorecard，跳过 task_scorecard 聚合层。待 Phase 3 引入并行 task 或多 attempt 重试策略时再补 task_scorecard。
+
 在 evaluation 模块的 `scoreAttempt` 完成后新增一步：
 
 1. 查询该 attempt 所属的 workflow_run_id
-2. 检查该 workflow_run 是否已有 run_scorecard（幂等）
-3. 取最新 attempt_scorecard_revision 的 dimension_scores 和 total_score
-4. 写入 run_scorecards
-
-同时检查该 workflow_run 是否属于某个 batch，若是则更新 batch 计数和状态。
+2. 取该 attempt 的 attempt_scorecard_revision 的 dimension_scores 和 total_score
+3. UPSERT 到 run_scorecards（后续 attempt 会覆盖，保证取最终 attempt）
+4. 检查该 workflow_run 是否属于某个 batch，若是则推进 batch 状态
 
 ### batch 状态推进
 
@@ -128,6 +154,20 @@ sequenceDiagram
 pending → running（创建时立即转为 running）
 running → completed（completed_runs + failed_runs = total_runs）
 ```
+
+**并发安全方案**：使用单条 SQL 原子计数并判定完成：
+
+```sql
+UPDATE experiment_batches
+SET completed_runs = (SELECT count(*) FROM experiment_batch_runs br JOIN workflow_runs wr ON wr.id = br.workflow_run_id WHERE br.batch_id = $1 AND wr.status = 'completed'),
+    failed_runs = (SELECT count(*) FROM experiment_batch_runs br JOIN workflow_runs wr ON wr.id = br.workflow_run_id WHERE br.batch_id = $1 AND wr.status = 'failed')
+WHERE id = $1;
+-- 然后在同一事务中检查是否 completed_runs + failed_runs >= total_runs → 标记 completed
+```
+
+实际实现使用 SELECT 计数 + 条件 UPDATE 在一个操作中完成（非 read-modify-write），避免两个 eval job 并发时的竞态。
+
+**version_set_ids 约束**：`version_set` 按架构文档为不可变不可删对象，JSONB 数组存储足够。API 层创建 batch 时校验所有 ID 在 version_sets 表中存在，拒绝无效引用。
 
 ## 影响范围
 
