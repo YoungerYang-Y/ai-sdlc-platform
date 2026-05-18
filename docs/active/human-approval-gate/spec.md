@@ -1,10 +1,10 @@
 ---
 id: spec-human-approval-gate
-status: draft
+status: shipped
 owner: "evan"
 tags: [workflow, approval, delivery]
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-19
 ---
 
 # 产品规格：人工审批门

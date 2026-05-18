@@ -1,10 +1,10 @@
 ---
 id: plan-human-approval-gate
-status: draft
+status: done
 owner: "evan"
 tags: [workflow, approval, delivery]
 created: 2026-05-18
-updated: 2026-05-18
+updated: 2026-05-19
 ---
 
 # 实施计划：人工审批门
