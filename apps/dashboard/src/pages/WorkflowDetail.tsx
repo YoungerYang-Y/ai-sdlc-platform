@@ -36,7 +36,7 @@ export function WorkflowDetail() {
   useEffect(() => {
     load();
     timerRef.current = setInterval(() => {
-      if (wf && (wf.status === "completed" || wf.status === "failed" || wf.status === "pending_approval")) {
+      if (wf && (wf.status === "completed" || wf.status === "failed")) {
         clearInterval(timerRef.current);
         return;
       }

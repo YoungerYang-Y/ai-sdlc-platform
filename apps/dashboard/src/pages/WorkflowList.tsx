@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { fetchWorkflows, type WorkflowSummary } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 
-const TABS = ["all", "running", "completed", "failed"] as const;
+const TABS = ["all", "running", "pending_approval", "completed", "failed"] as const;
 
 export function WorkflowList() {
   const navigate = useNavigate();
