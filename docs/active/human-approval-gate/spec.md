@@ -86,4 +86,6 @@ updated: 2026-05-18
 
 ## 度量与成功标准
 
-- 手动 workflow 100% 经过人工审批后才交付 PR
+- 手动 workflow 100% 经过人工审批后才交付 PR（正确性保障）
+- P50 审批延迟 < 10min（从 pending_approval 到 approve/reject 的操作者响应时间）
+- reject 率趋势下降反映 AI 质量持续改善
