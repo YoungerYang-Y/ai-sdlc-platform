@@ -8,6 +8,7 @@
     "test": "pnpm -r run test",
     "test:e2e": "vitest run tests/",
     "lint": "pnpm -r run lint",
+    "lint:arch": "npx tsx scripts/lint-arch-rules.ts",
     "typecheck": "pnpm -r run typecheck"
   },
   "devDependencies": {
