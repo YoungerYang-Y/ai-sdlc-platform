@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchWorkflow, fetchArtifact, type WorkflowDetail as WFDetail } from "../api";
+import { fetchWorkflow, fetchArtifact, approveWorkflow, rejectWorkflow, type WorkflowDetail as WFDetail } from "../api";
 import { StatusBadge } from "../components/StatusBadge";
 import { DiffViewer } from "../components/DiffViewer";
 import { MarkdownView } from "../components/MarkdownView";
@@ -22,8 +22,8 @@ export function WorkflowDetail() {
       setWf(data);
       setError("");
 
-      // Load artifacts if completed
-      if (data.status === "completed" || data.status === "failed") {
+      // Load artifacts if completed or pending approval
+      if (data.status === "completed" || data.status === "failed" || data.status === "pending_approval") {
         // Try loading patch and review (best-effort)
         fetchArtifact(`patch/${id}`).then(setPatch).catch(() => {});
         fetchArtifact(`review_report/${id}`).then(setReview).catch(() => {});
@@ -36,7 +36,7 @@ export function WorkflowDetail() {
   useEffect(() => {
     load();
     timerRef.current = setInterval(() => {
-      if (wf && (wf.status === "completed" || wf.status === "failed")) {
+      if (wf && (wf.status === "completed" || wf.status === "failed" || wf.status === "pending_approval")) {
         clearInterval(timerRef.current);
         return;
       }
@@ -60,6 +60,11 @@ export function WorkflowDetail() {
         {wf.finished_at && <span className="text-gray-400 text-xs">→ {new Date(wf.finished_at).toLocaleString()}</span>}
         <Link to={`/workflows/new?from=${wf.id}`} className="ml-auto text-sm text-blue-600 hover:underline">复制新增</Link>
       </div>
+
+      {/* Approval Panel */}
+      {wf.status === "pending_approval" && (
+        <ApprovalPanel workflowId={wf.id} onDone={load} />
+      )}
 
       {/* Input */}
       <div className="bg-white border rounded p-4">
@@ -103,6 +108,39 @@ export function WorkflowDetail() {
       <div className="bg-white border rounded p-4">
         <h2 className="font-medium text-sm text-gray-500 mb-2">审查报告</h2>
         {wf.status === "running" && !review ? <p className="text-gray-400 text-sm">执行中...</p> : <MarkdownView content={review} />}
+      </div>
+    </div>
+  );
+}
+
+function ApprovalPanel({ workflowId, onDone }: { workflowId: string; onDone: () => void }) {
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleApprove = async () => {
+    setLoading(true);
+    try { await approveWorkflow(workflowId); onDone(); } catch (e: any) { alert(e.message); }
+    setLoading(false);
+  };
+
+  const handleReject = async () => {
+    setLoading(true);
+    try { await rejectWorkflow(workflowId, reason || undefined); onDone(); } catch (e: any) { alert(e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="bg-yellow-50 border border-yellow-200 rounded p-4">
+      <h2 className="font-medium text-yellow-800 mb-2">等待审批</h2>
+      <p className="text-sm text-yellow-700 mb-3">请查看下方代码变更和审查报告后决定是否通过。</p>
+      <div className="flex items-center gap-3">
+        <button onClick={handleApprove} disabled={loading} className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 disabled:opacity-50">
+          ✓ Approve
+        </button>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="拒绝原因（可选）" className="border rounded px-3 py-2 text-sm flex-1" />
+        <button onClick={handleReject} disabled={loading} className="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 disabled:opacity-50">
+          ✗ Reject
+        </button>
       </div>
     </div>
   );

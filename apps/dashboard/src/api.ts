@@ -60,6 +60,16 @@ export async function fetchTasks(workflowId: string): Promise<TaskRun[]> {
   return res.json();
 }
 
+export async function approveWorkflow(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/workflows/${id}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `API error: ${res.status}`);
+}
+
+export async function rejectWorkflow(id: string, reason?: string): Promise<void> {
+  const res = await fetch(`${BASE}/workflows/${id}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `API error: ${res.status}`);
+}
+
 export async function fetchArtifact(ref: string): Promise<string> {
   const res = await fetch(`${BASE}/artifacts/${ref}`);
   if (!res.ok) throw new Error(`Artifact not found`);

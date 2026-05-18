@@ -18,7 +18,7 @@ export interface WorkflowRun {
   id: string;
   versionSetId: string;
   workflowDefinitionId: string;
-  status: "created" | "running" | "completed" | "failed" | "cancelled";
+  status: "created" | "running" | "completed" | "failed" | "cancelled" | "pending_approval";
   triggerType: string;
   input: Record<string, unknown>;
   currentStepId?: string;
@@ -67,7 +67,12 @@ export function createOrchestrator(config: OrchestratorConfig) {
     const nextStep = findNextStep(definition, run.completedSteps);
 
     if (!nextStep) {
-      // All steps done
+      // All steps done — manual workflows require human approval
+      if (run.triggerType === "manual") {
+        await sql`UPDATE workflow_runs SET status = 'pending_approval', updated_at = now() WHERE id = ${run.id}`;
+        run.status = "pending_approval";
+        return;
+      }
       await sql`UPDATE workflow_runs SET status = 'completed', finished_at = now(), updated_at = now() WHERE id = ${run.id}`;
       run.status = "completed";
       try { config.onWorkflowCompleted?.(run); } catch (err) { console.error("onWorkflowCompleted failed", err); }
@@ -262,6 +267,41 @@ export function createOrchestrator(config: OrchestratorConfig) {
 
   app.post("/workflows/:id/cancel", async (c) => {
     await sql`UPDATE workflow_runs SET status = 'cancelled', finished_at = now(), updated_at = now() WHERE id = ${c.req.param("id")}`;
+    return c.json({ ok: true });
+  });
+
+  app.post("/workflows/:id/approve", async (c) => {
+    const id = c.req.param("id");
+    const [row] = await sql`
+      UPDATE workflow_runs SET status = 'completed', finished_at = now(), updated_at = now()
+      WHERE id = ${id} AND status = 'pending_approval' RETURNING *
+    `;
+    if (!row) return c.json({ error: "not in pending_approval state" }, 409);
+    const run: WorkflowRun = {
+      id: row.id, versionSetId: row.version_set_id, workflowDefinitionId: row.workflow_definition_id,
+      status: "completed", triggerType: row.trigger_type, input: row.input as Record<string, unknown>,
+      completedSteps: row.completed_steps ?? [], createdAt: row.created_at,
+    };
+    console.log(JSON.stringify({ event: "workflow_approval", action: "approve", workflowId: id }));
+    try { config.onWorkflowCompleted?.(run); } catch (err) { console.error("onWorkflowCompleted failed", err); }
+    return c.json({ ok: true });
+  });
+
+  app.post("/workflows/:id/reject", async (c) => {
+    const id = c.req.param("id");
+    const { reason } = await c.req.json().catch(() => ({ reason: undefined }));
+    const [row] = await sql`
+      UPDATE workflow_runs SET status = 'failed', finished_at = now(), rejection_reason = ${reason ?? null}, updated_at = now()
+      WHERE id = ${id} AND status = 'pending_approval' RETURNING *
+    `;
+    if (!row) return c.json({ error: "not in pending_approval state" }, 409);
+    const run: WorkflowRun = {
+      id: row.id, versionSetId: row.version_set_id, workflowDefinitionId: row.workflow_definition_id,
+      status: "failed", triggerType: row.trigger_type, input: row.input as Record<string, unknown>,
+      completedSteps: row.completed_steps ?? [], createdAt: row.created_at,
+    };
+    console.log(JSON.stringify({ event: "workflow_approval", action: "reject", workflowId: id, reason: reason ?? null }));
+    try { config.onWorkflowFailed?.(run); } catch (err) { console.error("onWorkflowFailed failed", err); }
     return c.json({ ok: true });
   });
 
