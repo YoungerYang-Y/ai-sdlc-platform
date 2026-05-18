@@ -74,6 +74,65 @@ export function createEvaluation(config: EvaluationConfig) {
       INSERT INTO attempt_scorecard_revisions (id, attempt_id, source, trigger, weight_snapshot, dimension_scores, total_score, model_or_rubric_version, created_by)
       VALUES (${revisionId}, ${attemptId}, 'rule', 'attempt_complete', ${sql.json(WEIGHT_SNAPSHOT as unknown as Record<string, number>)}, ${sql.json(dimensions as unknown as Record<string, number>)}, ${totalScore}, 'rule-scorer-v1', 'system')
     `;
+
+    // 聚合 run_scorecard + 推进 batch 状态
+    await aggregateRunScorecard(attemptId, dimensions, totalScore);
+  }
+
+  async function aggregateRunScorecard(attemptId: string, dimensions: DimensionScores, totalScore: number): Promise<void> {
+    const [attempt] = await sql`SELECT task_run_id FROM worker_attempts WHERE id = ${attemptId}`;
+    if (!attempt) return;
+    const [task] = await sql`SELECT workflow_run_id FROM task_runs WHERE id = ${attempt.task_run_id}`;
+    if (!task) return;
+
+    const workflowRunId = task.workflow_run_id;
+
+    // Upsert run_scorecard（后续 attempt 覆盖，保证取最终）
+    await sql`
+      INSERT INTO run_scorecards (workflow_run_id, dimension_scores, total_score, source_attempt_id)
+      VALUES (${workflowRunId}, ${sql.json(dimensions as unknown as Record<string, number>)}, ${totalScore}, ${attemptId})
+      ON CONFLICT (workflow_run_id) DO UPDATE SET
+        dimension_scores = EXCLUDED.dimension_scores,
+        total_score = EXCLUDED.total_score,
+        source_attempt_id = EXCLUDED.source_attempt_id,
+        created_at = now()
+    `;
+
+    // 检查是否属于 batch 并推进状态
+    const [batchRun] = await sql`SELECT batch_id FROM experiment_batch_runs WHERE workflow_run_id = ${workflowRunId}`;
+    if (batchRun) {
+      await advanceBatchStatus(batchRun.batch_id);
+    }
+  }
+
+  async function advanceBatchStatus(batchId: string): Promise<void> {
+    // 原子计数（基于实际 workflow 状态，非 read-modify-write）
+    const [counts] = await sql`
+      SELECT
+        count(*) FILTER (WHERE wr.status = 'completed')::int as completed,
+        count(*) FILTER (WHERE wr.status = 'failed')::int as failed
+      FROM experiment_batch_runs br
+      JOIN workflow_runs wr ON wr.id = br.workflow_run_id
+      WHERE br.batch_id = ${batchId}
+    `;
+    const completed = Number(counts.completed);
+    const failed = Number(counts.failed);
+
+    const [batch] = await sql`SELECT total_runs FROM experiment_batches WHERE id = ${batchId}`;
+    if (!batch) return;
+
+    const allDone = completed + failed >= batch.total_runs;
+    if (allDone) {
+      await sql`
+        UPDATE experiment_batches
+        SET completed_runs = ${completed}, failed_runs = ${failed}, status = 'completed', finished_at = now()
+        WHERE id = ${batchId} AND status = 'running'
+      `;
+    } else {
+      await sql`
+        UPDATE experiment_batches SET completed_runs = ${completed}, failed_runs = ${failed} WHERE id = ${batchId}
+      `;
+    }
   }
 
   function computeRuleScores(summary: Record<string, unknown> | null): DimensionScores {

@@ -111,3 +111,42 @@ export async function fetchCompare(a: string, b: string): Promise<{ a: Scorecard
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
+
+// --- Experiment Batch API ---
+
+export interface BatchSummary {
+  id: string;
+  suite_name: string;
+  version_set_ids: string[];
+  status: string;
+  total_runs: number;
+  completed_runs: number;
+  failed_runs: number;
+  created_at: string;
+}
+
+export interface BatchRun {
+  benchmark_case_id: string;
+  version_set_id: string;
+  workflow_run_id: string;
+  case_name: string;
+  workflow_status: string;
+  dimension_scores: { success: number; efficiency: number; cost: number } | null;
+  total_score: number | null;
+}
+
+export interface BatchDetail extends BatchSummary {
+  runs: BatchRun[];
+}
+
+export async function fetchBatches(): Promise<BatchSummary[]> {
+  const res = await fetch(`${BASE}/experiment-batches`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchBatchDetail(id: string): Promise<BatchDetail> {
+  const res = await fetch(`${BASE}/experiment-batches/${id}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}

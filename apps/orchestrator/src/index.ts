@@ -3,6 +3,8 @@ import { serve } from "@hono/node-server";
 import { randomUUID } from "node:crypto";
 import { createScheduler, createSql, type Scheduler, type SubmitTaskInput } from "@ai-sdlc/scheduler";
 import { getWorkflow, type StepDefinition, type WorkflowDefinition } from "@ai-sdlc/workflow";
+import { createBenchmarkRoutes } from "./routes/benchmark.js";
+import { createExperimentRoutes } from "./routes/experiment.js";
 import type { TaskRun } from "@ai-sdlc/worker-sdk";
 
 // --- Types ---
@@ -137,6 +139,8 @@ export function createOrchestrator(config: OrchestratorConfig) {
 
   // HTTP API
   const app = new Hono();
+  app.route("/", createBenchmarkRoutes(sql));
+  app.route("/", createExperimentRoutes(sql, createWorkflowRun));
 
   // --- Orchestrator API ---
   app.post("/workflows", async (c) => {
