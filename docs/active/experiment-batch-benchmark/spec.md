@@ -1,6 +1,6 @@
 ---
 id: spec-experiment-batch-benchmark
-status: draft
+status: shipped
 owner: "evan"
 tags: [experiment, benchmark, evaluation]
 created: 2026-05-18

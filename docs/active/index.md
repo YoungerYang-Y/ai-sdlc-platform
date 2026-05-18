@@ -6,7 +6,7 @@
 
 | Slug | 标题 | 状态 | 创建日期 | 负责人 |
 |------|------|------|----------|--------|
-| experiment-batch-benchmark | 实验批次调度 + Benchmark 管理 | spec/design | 2026-05-18 | evan |
+| experiment-batch-benchmark | 实验批次调度 + Benchmark 管理 | shipped | 2026-05-18 | evan |
 
 ---
 

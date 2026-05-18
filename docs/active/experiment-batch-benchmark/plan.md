@@ -1,6 +1,6 @@
 ---
 id: plan-experiment-batch-benchmark
-status: in-progress
+status: done
 owner: "evan"
 tags: [experiment, benchmark, evaluation]
 created: 2026-05-18
