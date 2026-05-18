@@ -106,7 +106,11 @@ export function createEvaluation(config: EvaluationConfig) {
   }
 
   async function advanceBatchStatus(batchId: string): Promise<void> {
-    // 原子计数（基于实际 workflow 状态，非 read-modify-write）
+    // 并发安全说明：
+    // SELECT count 基于实际 workflow 状态（非增量 +1），两个并发 eval job 可能同时执行。
+    // 最终的 UPDATE ... WHERE status = 'running' 保证只有一个 UPDATE 将 status 改为 completed
+    // （另一个因 WHERE 不匹配而无效），确保幂等性。中间状态下 completed_runs 可能短暂不准确，
+    // 但最终一致。
     const [counts] = await sql`
       SELECT
         count(*) FILTER (WHERE wr.status = 'completed')::int as completed,

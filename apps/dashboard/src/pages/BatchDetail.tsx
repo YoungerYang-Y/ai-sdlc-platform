@@ -5,7 +5,7 @@ import { fetchBatchDetail, type BatchDetail, type BatchRun } from "../api";
 export function BatchDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [batch, setBatch] = useState<BatchDetail | null>(null);
-  useEffect(() => { if (id) fetchBatchDetail(id).then(setBatch); }, [id]);
+  useEffect(() => { if (id) fetchBatchDetail(id).then(setBatch).catch(console.error); }, [id]);
 
   if (!batch) return <div className="p-6 text-gray-400">加载中...</div>;
 

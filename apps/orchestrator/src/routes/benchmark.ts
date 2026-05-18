@@ -30,6 +30,8 @@ export function createBenchmarkRoutes(sql: postgres.Sql) {
     const suiteId = c.req.param("id");
     const { name, input } = await c.req.json();
     if (!name || !input?.requirement) return c.json({ error: "name and input.requirement required" }, 400);
+    const [suite] = await sql`SELECT id FROM benchmark_suites WHERE id = ${suiteId}`;
+    if (!suite) return c.json({ error: "suite not found" }, 404);
     const [row] = await sql`INSERT INTO benchmark_cases (suite_id, name, input) VALUES (${suiteId}, ${name}, ${sql.json(input)}) RETURNING *`;
     return c.json(row, 201);
   });

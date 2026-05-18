@@ -7,6 +7,8 @@ interface WorkflowRun {
 
 type CreateWorkflowRun = (req: { versionSetId: string; triggerType: string; input: Record<string, unknown>; workflowDefinitionId?: string }) => Promise<WorkflowRun>;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 export function createExperimentRoutes(sql: postgres.Sql, createWorkflowRun: CreateWorkflowRun) {
   const app = new Hono();
 
@@ -14,6 +16,10 @@ export function createExperimentRoutes(sql: postgres.Sql, createWorkflowRun: Cre
     const { suiteId, versionSetIds } = await c.req.json();
     if (!suiteId || !versionSetIds || versionSetIds.length < 2) {
       return c.json({ error: "suiteId and at least 2 versionSetIds required" }, 400);
+    }
+    // UUID 格式校验
+    if (!versionSetIds.every((id: unknown) => typeof id === "string" && UUID_RE.test(id))) {
+      return c.json({ error: "invalid versionSetId format" }, 400);
     }
     // 校验 version_set 存在
     const vsCheck = await sql`SELECT id FROM version_sets WHERE id = ANY(${versionSetIds})`;
@@ -24,6 +30,12 @@ export function createExperimentRoutes(sql: postgres.Sql, createWorkflowRun: Cre
     const cases = await sql`SELECT * FROM benchmark_cases WHERE suite_id = ${suiteId}`;
     if (cases.length === 0) return c.json({ error: "suite has no cases" }, 400);
 
+    // 预校验所有 case 的 input 包含 requirement
+    const invalidCase = cases.find((cs: any) => !(cs.input as Record<string, unknown>)?.requirement);
+    if (invalidCase) {
+      return c.json({ error: `benchmark case "${(invalidCase as any).name}" missing input.requirement` }, 400);
+    }
+
     const totalRuns = cases.length * versionSetIds.length;
     const [batch] = await sql`
       INSERT INTO experiment_batches (suite_id, version_set_ids, status, total_runs)
@@ -31,18 +43,24 @@ export function createExperimentRoutes(sql: postgres.Sql, createWorkflowRun: Cre
       RETURNING *
     `;
 
-    for (const cs of cases) {
-      for (const vsId of versionSetIds as string[]) {
-        const run = await createWorkflowRun({
-          versionSetId: vsId,
-          triggerType: "experiment",
-          input: cs.input as Record<string, unknown>,
-        });
-        await sql`
-          INSERT INTO experiment_batch_runs (batch_id, benchmark_case_id, version_set_id, workflow_run_id)
-          VALUES (${batch.id}, ${cs.id}, ${vsId}, ${run.id})
-        `;
+    // 创建 workflow_runs，失败时标记 batch 为 failed
+    try {
+      for (const cs of cases) {
+        for (const vsId of versionSetIds as string[]) {
+          const run = await createWorkflowRun({
+            versionSetId: vsId,
+            triggerType: "experiment",
+            input: cs.input as Record<string, unknown>,
+          });
+          await sql`
+            INSERT INTO experiment_batch_runs (batch_id, benchmark_case_id, version_set_id, workflow_run_id)
+            VALUES (${batch.id}, ${cs.id}, ${vsId}, ${run.id})
+          `;
+        }
       }
+    } catch (err) {
+      await sql`UPDATE experiment_batches SET status = 'failed', finished_at = now() WHERE id = ${batch.id}`;
+      return c.json({ error: "batch creation partially failed", batchId: batch.id }, 500);
     }
 
     return c.json(batch, 201);

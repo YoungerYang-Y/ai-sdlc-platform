@@ -3,8 +3,6 @@
 
 BEGIN;
 
-INSERT INTO schema_migrations (version, filename) VALUES (2, '002_experiment_batch_benchmark.sql');
-
 -- Benchmark 管理
 CREATE TABLE benchmark_suites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -57,5 +55,7 @@ CREATE TABLE run_scorecards (
   source_attempt_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+INSERT INTO schema_migrations (version, filename) VALUES (2, '002_experiment_batch_benchmark.sql');
 
 COMMIT;
