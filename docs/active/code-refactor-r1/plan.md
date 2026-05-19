@@ -5,6 +5,8 @@ owner: "evan"
 tags: [refactor, code-quality]
 created: 2026-05-19
 updated: 2026-05-19
+spec: spec-code-refactor-r1
+design: design-code-refactor-r1
 ---
 
 # 实施计划：代码审查与重构
@@ -13,93 +15,63 @@ updated: 2026-05-19
 
 改善核心模块的职责分离和代码组织，消除重复代码，不改变任何公共 API 行为。
 
-## 审查发现
+## 执行模式
 
-| # | 模块 | 问题 | 优先级 |
-|---|------|------|--------|
-| R1 | orchestrator/index.ts | 300+ 行，混合 workflow engine 和 HTTP 路由。DB row → WorkflowRun 映射重复 5 处 | P1 |
-| R2 | orchestrator/index.ts | `findFiles` 内嵌在路由中，每次动态 import（`await import("node:path")`） | P1 |
-| R3 | orchestrator/index.ts | `getScorecard` 内联在路由 handler 中 | P2 |
-| R4 | evaluation/index.ts | 单文件 130+ 行承载评分 + run_scorecard 聚合 + batch 推进三个职责 | P2 |
-| R5 | 全局 | orchestrator 无统一 `mapWorkflowRun` helper | P1 |
-| R6 | code-worker/index.ts | 170+ 行单文件，handler + git 工具混在一起 | P2 |
-| R7 | Dashboard pages | 无错误边界，fetch 失败时用户无反馈 | P2 |
+parallel — 所有任务无交叉依赖，可并行执行。
 
 ## 任务清单
 
-### T1: Orchestrator 拆分（P1 — R1+R2+R3+R5）
+### T1: Orchestrator 拆分（P1）
 
-**目标**：index.ts 从 300 行降到 ~80 行。
+**范围**：`apps/orchestrator/src/`
 
-**拆分结构**：
+1. 创建 `helpers.ts`：提取 `mapWorkflowRun(row): WorkflowRun` + `findFiles(dir): Promise<string[]>`（顶层 import node:path/fs）
+2. 创建 `engine.ts`：提取 `createWorkflowRun`、`advanceWorkflow`、`findNextStep`、`handleTaskCompleted`、`handleTaskFailed`。通过闭包引用 `scheduler`（与当前 let scheduler 模式一致）
+3. 创建 `routes/workflow.ts`：workflow CRUD + approve/reject（≤80 行）
+4. 创建 `routes/scorecard.ts`：/scorecards/compare
+5. 创建 `routes/artifacts.ts`：/artifacts/:type/:workflowId（使用 helpers.findFiles）
+6. 创建 `routes/scheduler-api.ts`：/tasks/claim + /attempts/*
+7. 重写 `index.ts`：组装 engine + 挂载所有 routes + start/stop（≤100 行）
 
-```
-apps/orchestrator/src/
-├── index.ts              # createOrchestrator: 组装 engine + routes + start/stop
-├── engine.ts             # workflow engine: createWorkflowRun, advanceWorkflow, handleTaskCompleted/Failed
-├── helpers.ts            # mapWorkflowRun(row) + findFiles（顶层 import）
-├── routes/
-│   ├── workflow.ts       # /workflows CRUD + /scorecards/compare + /artifacts + approve/reject
-│   ├── scheduler-api.ts  # /tasks/claim + /attempts/*
-│   ├── benchmark.ts      # 已存在
-│   └── experiment.ts     # 已存在
-```
+**初始化顺序**：createOrchestrator → 创建 sql → 创建 engine（scheduler=null）→ start() 中创建 scheduler 并注入 engine
 
-**具体步骤**：
-1. 创建 `helpers.ts`：提取 `mapWorkflowRun(row): WorkflowRun` + `findFiles(dir): string[]`（顶层 import node:path/fs）
-2. 创建 `engine.ts`：提取 `createWorkflowRun`、`advanceWorkflow`、`findNextStep`、`handleTaskCompleted`、`handleTaskFailed`。导出为 `createWorkflowEngine(sql, scheduler, config)` 工厂
-3. 创建 `routes/workflow.ts`：提取 workflow CRUD + scorecards/compare + artifacts + approve/reject
-4. 创建 `routes/scheduler-api.ts`：提取 /tasks/claim + /attempts/*
-5. 重写 `index.ts`：仅组装 engine + 挂载所有路由 + start/stop
-
-**约束**：
-- `createOrchestrator` 的公共签名和返回类型不变
-- `app` 对外暴露不变（测试直接用 app.request）
-- WorkflowRun 类型导出位置不变
-
-**验证**：typecheck 通过、现有测试通过
+**验证**：`pnpm typecheck && pnpm -r --filter='!@ai-sdlc/scheduler' --filter='!@ai-sdlc/observability' run test`
 
 ---
 
-### T2: Evaluation 职责分离（P2 — R4）
+### T2: Evaluation 职责分离（P2）
 
-**拆分为**：
+**范围**：`packages/evaluation/src/`
 
-```
-packages/evaluation/src/
-├── index.ts              # createEvaluation: job processing + start/stop
-├── scorer.ts             # computeRuleScores + WEIGHT_SNAPSHOT
-├── aggregator.ts         # aggregateRunScorecard + advanceBatchStatus
-```
+1. 创建 `scorer.ts`：提取 `WEIGHT_SNAPSHOT`、`DimensionScores`、`computeRuleScores`
+2. 创建 `aggregator.ts`：提取 `aggregateRunScorecard`、`advanceBatchStatus`
+3. 简化 `index.ts`：仅保留 `createEvaluation`（job loop + start/stop），import scorer 和 aggregator
 
-**验证**：typecheck 通过
+**验证**：`pnpm -r --filter='@ai-sdlc/evaluation' run typecheck`
 
 ---
 
-### T3: Code Worker handler 拆分（P2 — R6）
+### T3: Code Worker handler 拆分（P2）
 
-**拆分为**：
+**范围**：`workers/code-worker/src/`
 
-```
-workers/code-worker/src/
-├── index.ts              # entrypoint + worker 创建
-├── handler.ts            # 路由到 mock/code/verify
-├── handlers/mock.ts
-├── handlers/code.ts
-├── handlers/verify.ts
-├── git-utils.ts          # gitDiff, execOutput, execVoid
-```
+1. 创建 `git-utils.ts`：提取 `gitDiff`、`execOutput`、`execVoid`、`DIFF_EXCLUDE`
+2. 创建 `handlers/mock.ts`、`handlers/code.ts`、`handlers/verify.ts`
+3. 创建 `handler.ts`：路由分发（import handlers）
+4. 简化 `index.ts`：仅保留 entrypoint（env 解析 + worker 创建 + isMain）（≤60 行）
 
-**验证**：typecheck 通过、现有 code-worker 测试通过
+**验证**：`pnpm -r --filter='@ai-sdlc/code-worker' run typecheck && pnpm -r --filter='@ai-sdlc/code-worker' run test`
 
 ---
 
-### T4: Dashboard 错误处理（P2 — R7）
+### T4: Dashboard 错误处理（P2）
 
-- BatchList/WorkflowList 的 fetch 添加 .catch + 错误状态展示
-- 统一模式：loading → data / error 三态
+**范围**：`apps/dashboard/src/pages/`
 
-**验证**：typecheck 通过
+- BatchList.tsx：fetch 添加 .catch + error state
+- WorkflowList.tsx：同上
+
+**验证**：`pnpm -r --filter='@ai-sdlc/dashboard' run typecheck`
 
 ---
 
@@ -110,27 +82,26 @@ T1（独立）
 T2（独立）
 T3（独立）
 T4（独立）
-（全部可并行，无交叉依赖）
 ```
 
 ## 执行策略
 
-- 分两次提交：
-  1. P1 提交：T1（orchestrator 拆分）
-  2. P2 提交：T2 + T3 + T4
-- 每次提交前 typecheck + test 全绿
-
-## 不做
-
-- 不改变任何公共 API 行为
-- 不引入新依赖
-- 不修改测试逻辑（拆分后已有测试继续通过）
-- 不改变文件的对外导出签名
+- P1 提交：T1（orchestrator 拆分）
+- P2 提交：T2 + T3 + T4
 
 ## 完成标准
 
 - `pnpm typecheck` 14/14 通过
-- `pnpm test`（非 DB 部分）34/34 通过
-- orchestrator/index.ts ≤ 100 行
-- evaluation/index.ts ≤ 60 行
-- code-worker/src/index.ts ≤ 40 行
+- `pnpm -r --filter='!@ai-sdlc/scheduler' --filter='!@ai-sdlc/observability' run test` 全绿
+- orchestrator/src/index.ts ≤ 100 行
+- code-worker/src/index.ts ≤ 60 行
+- 行数约束为指导性人工检查项，不添加 lint max-lines 规则
+
+## 决策日志
+
+| 决策 | 理由 |
+|------|------|
+| routes/workflow.ts 拆出 scorecard.ts + artifacts.ts | 避免新文件也膨胀到 200 行 |
+| engine 通过闭包引用 scheduler | 与当前 `let scheduler` 模式一致，无循环依赖 |
+| code-worker index.ts ≤ 60 行（非 40） | 入口需 import + env + worker + signal + isMain，40 行过紧 |
+| 不加 eslint max-lines | 维护成本高于收益，人工检查足够 |
