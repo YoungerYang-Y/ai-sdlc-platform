@@ -1,6 +1,6 @@
 ---
 id: design-code-refactor-r1
-status: draft
+status: in-progress
 owner: "evan"
 tags: [refactor, code-quality]
 created: 2026-05-19
@@ -12,6 +12,20 @@ verified:
 ## 背景
 
 orchestrator/index.ts 混合了 workflow engine、HTTP 路由和文件操作，300+ 行难以维护。evaluation 和 code-worker 存在类似的职责混合问题。
+
+## 技术方案
+
+### 数据模型
+
+不适用——不引入新实体，不修改数据库 schema。
+
+### 接口契约
+
+不适用——公共 API（createOrchestrator 签名、返回类型、app 暴露）不变。详见约束节。
+
+### 核心流程
+
+纯文件拆分，不改变运行时数据流。拆分后模块间调用关系见下方"模块拆分设计"。
 
 ## 模块拆分设计
 
@@ -83,6 +97,25 @@ workers/code-worker/src/
 - 现有测试不修改断言逻辑即可通过
 - 行数上限为指导性约束（人工检查），不添加 lint max-lines 规则（成本高于收益）
 
+## 影响范围
+
+| 模块/文件 | 变更类型 | 说明 |
+|-----------|----------|------|
+| `apps/orchestrator/src/index.ts` | 修改 | 缩减为组装层 |
+| `apps/orchestrator/src/engine.ts` | 新增 | workflow 状态机 |
+| `apps/orchestrator/src/helpers.ts` | 新增 | mapWorkflowRun + findFiles |
+| `apps/orchestrator/src/routes/workflow.ts` | 新增 | CRUD + approve/reject |
+| `apps/orchestrator/src/routes/scorecard.ts` | 新增 | compare API |
+| `apps/orchestrator/src/routes/artifacts.ts` | 新增 | 文件系统产物读取 |
+| `apps/orchestrator/src/routes/scheduler-api.ts` | 新增 | worker 通信 |
+| `packages/evaluation/src/scorer.ts` | 新增 | 评分逻辑 |
+| `packages/evaluation/src/aggregator.ts` | 新增 | run_scorecard + batch |
+| `packages/evaluation/src/index.ts` | 修改 | 缩减为 job loop |
+| `workers/code-worker/src/handler.ts` | 新增 | 路由分发 |
+| `workers/code-worker/src/handlers/*.ts` | 新增 | mock/code/verify |
+| `workers/code-worker/src/git-utils.ts` | 新增 | git 工具函数 |
+| `workers/code-worker/src/index.ts` | 修改 | 缩减为入口 |
+
 ## 迁移与兼容
 
 不适用——纯内部重构，无 schema/API/数据格式变更。
@@ -106,6 +139,7 @@ workers/code-worker/src/
 | 不做（保持现状） | 零风险，不花时间 | 300 行单文件持续膨胀，后续迭代成本递增；新增需求（Phase 3）将使 orchestrator 更难维护 |
 | 仅提取 helpers（最小拆分） | 改动最小 | 职责混合问题未解决，engine 和路由仍耦合 |
 | 当前方案（engine + routes 分离） | 职责清晰、文件可独立理解 | 需要较多文件移动 |
+| 引入 DI 容器 / plugin 注册机制 | 解耦更彻底，扩展性强 | 当前规模（~15 路由）不需要，over-engineering；Phase 4 多服务拆分时再评估 |
 
 ## 验证方式
 

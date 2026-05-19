@@ -33,11 +33,21 @@ updated: 2026-05-19
 
 ## 验收标准
 
+> 纯内部重构无用户行为变化，采用技术验证清单而非 Given/When/Then。
+
 - [ ] `pnpm typecheck` 14/14 通过
 - [ ] `pnpm -r --filter='!@ai-sdlc/scheduler' --filter='!@ai-sdlc/observability' run test` 全绿
 - [ ] orchestrator/src/index.ts ≤ 100 行
 - [ ] 每个拆分出的文件职责单一（单一导出主题）
 - [ ] 无新增 lint 或 test 失败
+
+## 异常与边界情况
+
+| 场景 | 触发条件 | 预期行为 |
+|------|----------|----------|
+| typecheck 失败 | 拆分后 import 路径错误或类型不兼容 | 修复后再提交；若无法快速修复则 `git revert` 回退 |
+| 循环 import | 拆分后模块间产生循环依赖 | 调整模块边界，确保依赖单向 |
+| 集成测试失败 | 路由挂载顺序或 app 暴露方式变化 | 检查 createOrchestrator 返回的 app 是否仍挂载所有路由 |
 
 ## 产品约束
 

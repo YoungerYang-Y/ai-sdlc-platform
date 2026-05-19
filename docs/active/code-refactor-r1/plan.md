@@ -1,6 +1,6 @@
 ---
 id: plan-code-refactor-r1
-status: draft
+status: in-progress
 owner: "evan"
 tags: [refactor, code-quality]
 created: 2026-05-19
@@ -23,7 +23,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T1: Orchestrator 拆分（P1）
 
-**agent**: developer | **status**: pending
+**id**: T1 | **depends_on**: none | **agent**: developer | **status**: pending
 
 **范围**：`apps/orchestrator/src/`
 
@@ -43,7 +43,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T2: Evaluation 职责分离（P2）
 
-**agent**: developer | **status**: pending
+**id**: T2 | **depends_on**: none | **agent**: developer | **status**: pending
 
 **范围**：`packages/evaluation/src/`
 
@@ -57,7 +57,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T3: Code Worker handler 拆分（P2）
 
-**agent**: developer | **status**: pending
+**id**: T3 | **depends_on**: none | **agent**: developer | **status**: pending
 
 **范围**：`workers/code-worker/src/`
 
@@ -72,7 +72,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T4: Dashboard 错误处理（P2）
 
-**agent**: developer | **status**: pending
+**id**: T4 | **depends_on**: none | **agent**: developer | **status**: pending
 
 **范围**：`apps/dashboard/src/pages/`
 
