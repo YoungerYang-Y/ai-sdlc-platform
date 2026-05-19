@@ -46,7 +46,7 @@ apps/orchestrator/src/
 **初始化顺序**：
 1. `createOrchestrator(config)` 创建 sql 连接
 2. 创建 engine（此时 scheduler 为 null）
-3. `start()` 时创建 scheduler，注入 engine（engine 通过 setter 或闭包获取 scheduler 引用）
+3. `start()` 时创建 scheduler，注入 engine（engine 通过闭包获取 scheduler 引用）
 4. 挂载所有 routes
 
 **engine 与 scheduler 的依赖协调**：engine 内部 `submitTask` 通过闭包引用 scheduler 变量（与当前 `let scheduler: Scheduler` 模式一致），不产生循环依赖。
@@ -82,6 +82,30 @@ workers/code-worker/src/
 - 公共 API（createOrchestrator 签名、返回类型、app 暴露）不变
 - 现有测试不修改断言逻辑即可通过
 - 行数上限为指导性约束（人工检查），不添加 lint max-lines 规则（成本高于收益）
+
+## 迁移与兼容
+
+不适用——纯内部重构，无 schema/API/数据格式变更。
+
+## 发布与回滚
+
+不适用——重构不改变运行时行为，若引入 bug 通过 `git revert` 回退整个提交即可。
+
+## 观测性
+
+不适用——不引入新的可观测指标或日志格式。
+
+## 异常处理
+
+不适用——不引入新的错误路径。
+
+## 备选方案
+
+| 方案 | 优势 | 否决原因 |
+|------|------|----------|
+| 不做（保持现状） | 零风险，不花时间 | 300 行单文件持续膨胀，后续迭代成本递增；新增需求（Phase 3）将使 orchestrator 更难维护 |
+| 仅提取 helpers（最小拆分） | 改动最小 | 职责混合问题未解决，engine 和路由仍耦合 |
+| 当前方案（engine + routes 分离） | 职责清晰、文件可独立理解 | 需要较多文件移动 |
 
 ## 验证方式
 

@@ -23,6 +23,8 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T1: Orchestrator 拆分（P1）
 
+**agent**: developer | **status**: pending
+
 **范围**：`apps/orchestrator/src/`
 
 1. 创建 `helpers.ts`：提取 `mapWorkflowRun(row): WorkflowRun` + `findFiles(dir): Promise<string[]>`（顶层 import node:path/fs）
@@ -41,6 +43,8 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T2: Evaluation 职责分离（P2）
 
+**agent**: developer | **status**: pending
+
 **范围**：`packages/evaluation/src/`
 
 1. 创建 `scorer.ts`：提取 `WEIGHT_SNAPSHOT`、`DimensionScores`、`computeRuleScores`
@@ -52,6 +56,8 @@ parallel — 所有任务无交叉依赖，可并行执行。
 ---
 
 ### T3: Code Worker handler 拆分（P2）
+
+**agent**: developer | **status**: pending
 
 **范围**：`workers/code-worker/src/`
 
@@ -65,6 +71,8 @@ parallel — 所有任务无交叉依赖，可并行执行。
 ---
 
 ### T4: Dashboard 错误处理（P2）
+
+**agent**: developer | **status**: pending
 
 **范围**：`apps/dashboard/src/pages/`
 
@@ -88,6 +96,20 @@ T4（独立）
 
 - P1 提交：T1（orchestrator 拆分）
 - P2 提交：T2 + T3 + T4
+
+## 回滚方案
+
+纯重构，每次提交为原子单元。若引入回归：
+- `git revert <commit>` 回退对应提交
+- 无数据迁移、无 schema 变更，回退零成本
+
+## 风险与阻塞
+
+| 风险 | 影响 | 缓解 |
+|------|------|------|
+| 拆分后循环 import | typecheck 报错 | 设计中已明确依赖方向（engine→scheduler 闭包） |
+| 集成测试依赖 app.request | 路由挂载顺序变化可能影响 | 拆分后立即运行测试验证 |
+| export 签名变化 | 上游 server.ts 编译失败 | createOrchestrator 签名不变 |
 
 ## 完成标准
 

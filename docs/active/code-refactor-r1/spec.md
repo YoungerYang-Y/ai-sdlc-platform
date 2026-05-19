@@ -43,3 +43,17 @@ updated: 2026-05-19
 
 - 纯内部重构，无用户可感知行为变化
 - 不阻塞其他开发任务
+
+## 用户场景
+
+### 场景 1：开发者修改 workflow 逻辑
+
+1. 开发者需要修改 advanceWorkflow 行为
+2. 打开 `engine.ts`（~100行），快速定位状态机逻辑
+3. 修改后 typecheck 通过，确认未影响路由层
+
+### 场景 2：开发者新增 API 端点
+
+1. 开发者需要添加新的 orchestrator API
+2. 在 `routes/` 下找到对应域的路由文件（或新建）
+3. 不需要理解 workflow engine 内部实现
