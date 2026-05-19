@@ -4,11 +4,13 @@ import { fetchBatches, type BatchSummary } from "../api";
 
 export function BatchList() {
   const [batches, setBatches] = useState<BatchSummary[]>([]);
-  useEffect(() => { fetchBatches().then(setBatches); }, []);
+  const [error, setError] = useState("");
+  useEffect(() => { fetchBatches().then(setBatches).catch((e) => setError(e.message)); }, []);
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">实验批次</h1>
+      {error && <p className="text-red-600 mb-4">{error}</p>}
       <table className="w-full bg-white rounded shadow text-sm">
         <thead className="bg-gray-100">
           <tr>
