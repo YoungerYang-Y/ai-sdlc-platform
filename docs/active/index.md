@@ -8,6 +8,7 @@
 |------|------|------|----------|--------|
 | experiment-batch-benchmark | 实验批次调度 + Benchmark 管理 | shipped | 2026-05-18 | evan |
 | human-approval-gate | 人工审批门 | shipped | 2026-05-18 | evan |
+| code-refactor-r1 | 代码审查与重构 | plan | 2026-05-19 | evan |
 
 ---
 
