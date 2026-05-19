@@ -1,6 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { WorkflowRun } from "./index.js";
+import type { WorkflowRun } from "./types.js";
 
 export function mapWorkflowRun(row: any): WorkflowRun {
   return {

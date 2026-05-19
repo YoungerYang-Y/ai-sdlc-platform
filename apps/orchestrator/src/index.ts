@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { createScheduler, createSql, type Scheduler } from "@ai-sdlc/scheduler";
-import type { TaskRun } from "@ai-sdlc/worker-sdk";
 import { createWorkflowEngine } from "./engine.js";
 import { createBenchmarkRoutes } from "./routes/benchmark.js";
 import { createExperimentRoutes } from "./routes/experiment.js";
@@ -9,29 +8,9 @@ import { createWorkflowRoutes } from "./routes/workflow.js";
 import { createScorecardRoutes } from "./routes/scorecard.js";
 import { createArtifactRoutes } from "./routes/artifacts.js";
 import { createSchedulerApiRoutes } from "./routes/scheduler-api.js";
+import type { OrchestratorConfig } from "./types.js";
 
-// --- Types ---
-
-export interface WorkflowRun {
-  id: string;
-  versionSetId: string;
-  workflowDefinitionId: string;
-  status: "created" | "running" | "completed" | "failed" | "cancelled" | "pending_approval";
-  triggerType: string;
-  input: Record<string, unknown>;
-  currentStepId?: string;
-  completedSteps: string[];
-  createdAt: string;
-}
-
-export interface OrchestratorConfig {
-  port: number;
-  connectionString: string;
-  schedulerConfig?: { leaseDefaultMs?: number; leaseScanIntervalMs?: number };
-  onAttemptFinished?: (attemptId: string) => void;
-  onWorkflowCompleted?: (run: WorkflowRun) => void;
-  onWorkflowFailed?: (run: WorkflowRun) => void;
-}
+export type { WorkflowRun, OrchestratorConfig } from "./types.js";
 
 // --- Orchestrator ---
 

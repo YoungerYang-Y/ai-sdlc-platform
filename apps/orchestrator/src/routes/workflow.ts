@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type postgres from "postgres";
-import type { WorkflowRun, OrchestratorConfig } from "../index.js";
+import type { WorkflowRun, OrchestratorConfig } from "../types.js";
 import { mapWorkflowRun } from "../helpers.js";
 
 export function createWorkflowRoutes(sql: postgres.Sql, engine: { createWorkflowRun: (req: any) => Promise<WorkflowRun> }, config: OrchestratorConfig) {

@@ -23,7 +23,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T1: Orchestrator 拆分（P1）
 
-**id**: T1 | **depends_on**: none | **agent**: developer | **status**: pending
+**id**: T1 | **depends_on**: none | **agent**: developer | **status**: done
 
 **范围**：`apps/orchestrator/src/`
 
@@ -43,7 +43,7 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T2: Evaluation 职责分离（P2）
 
-**id**: T2 | **depends_on**: none | **agent**: developer | **status**: pending
+**id**: T2 | **depends_on**: none | **agent**: developer | **status**: done
 
 **范围**：`packages/evaluation/src/`
 
@@ -57,14 +57,13 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T3: Code Worker handler 拆分（P2）
 
-**id**: T3 | **depends_on**: none | **agent**: developer | **status**: pending
+**id**: T3 | **depends_on**: none | **agent**: developer | **status**: done
 
 **范围**：`workers/code-worker/src/`
 
 1. 创建 `git-utils.ts`：提取 `gitDiff`、`execOutput`、`execVoid`、`DIFF_EXCLUDE`
 2. 创建 `handlers/mock.ts`、`handlers/code.ts`、`handlers/verify.ts`
-3. 创建 `handler.ts`：路由分发（import handlers）
-4. 简化 `index.ts`：仅保留 entrypoint（env 解析 + worker 创建 + isMain）（≤60 行）
+3. 简化 `index.ts`：入口 + 分发逻辑（3 行 if/else 足够简单，不需要独立 handler.ts）
 
 **验证**：`pnpm -r --filter='@ai-sdlc/code-worker' run typecheck && pnpm -r --filter='@ai-sdlc/code-worker' run test`
 
@@ -72,12 +71,12 @@ parallel — 所有任务无交叉依赖，可并行执行。
 
 ### T4: Dashboard 错误处理（P2）
 
-**id**: T4 | **depends_on**: none | **agent**: developer | **status**: pending
+**id**: T4 | **depends_on**: none | **agent**: developer | **status**: done
 
 **范围**：`apps/dashboard/src/pages/`
 
 - BatchList.tsx：fetch 添加 .catch + error state
-- WorkflowList.tsx：同上
+- WorkflowList.tsx：已有错误处理（try/catch + error state），无需修改
 
 **验证**：`pnpm -r --filter='@ai-sdlc/dashboard' run typecheck`
 

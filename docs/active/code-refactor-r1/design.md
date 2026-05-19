@@ -101,6 +101,7 @@ workers/code-worker/src/
 
 | 模块/文件 | 变更类型 | 说明 |
 |-----------|----------|------|
+| `apps/orchestrator/src/types.ts` | 新增 | WorkflowRun + OrchestratorConfig 类型 |
 | `apps/orchestrator/src/index.ts` | 修改 | 缩减为组装层 |
 | `apps/orchestrator/src/engine.ts` | 新增 | workflow 状态机 |
 | `apps/orchestrator/src/helpers.ts` | 新增 | mapWorkflowRun + findFiles |
@@ -111,10 +112,9 @@ workers/code-worker/src/
 | `packages/evaluation/src/scorer.ts` | 新增 | 评分逻辑 |
 | `packages/evaluation/src/aggregator.ts` | 新增 | run_scorecard + batch |
 | `packages/evaluation/src/index.ts` | 修改 | 缩减为 job loop |
-| `workers/code-worker/src/handler.ts` | 新增 | 路由分发 |
 | `workers/code-worker/src/handlers/*.ts` | 新增 | mock/code/verify |
 | `workers/code-worker/src/git-utils.ts` | 新增 | git 工具函数 |
-| `workers/code-worker/src/index.ts` | 修改 | 缩减为入口 |
+| `workers/code-worker/src/index.ts` | 修改 | 缩减为入口（分发合并在内） |
 
 ## 迁移与兼容
 

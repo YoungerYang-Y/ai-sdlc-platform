@@ -3,7 +3,7 @@ import type postgres from "postgres";
 import type { Scheduler } from "@ai-sdlc/scheduler";
 import { getWorkflow, type StepDefinition, type WorkflowDefinition } from "@ai-sdlc/workflow";
 import type { TaskRun } from "@ai-sdlc/worker-sdk";
-import type { WorkflowRun, OrchestratorConfig } from "./index.js";
+import type { WorkflowRun, OrchestratorConfig } from "./types.js";
 import { mapWorkflowRun } from "./helpers.js";
 
 interface StepParams { stepId: string; [key: string]: unknown; }
